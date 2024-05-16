@@ -1,11 +1,18 @@
 #!/usr/bin/python3
 
-from utils import Coords2D, State, CarLikeRobot, LimoBot
+from utils import *
 from problem import Problem
 from executor import Executor
 
-from dataclasses import asdict
+from dataclasses import dataclass, asdict
 from casadi import *
+
+@dataclass
+class State:
+    x : SX
+    y : SX
+    theta : SX
+    t : SX
 
 class DubinCar(Problem):
 
@@ -13,7 +20,10 @@ class DubinCar(Problem):
         super(DubinCar, self).__init__()
         self.robot = robot
         self.prep_robot_information()
-        self.number_of_states = 15
+
+        # Formulation Parameters
+        self.number_of_states = 5
+        self.dt_max = 3 # s
 
     def prep_robot_information(self):
         self.minimum_turning_radius = self.robot.get_minimum_turning_radius()
@@ -23,17 +33,13 @@ class DubinCar(Problem):
         self.max_steering_angle = self.robot.get_max_steering_angle()
 
     def prep_problem(self, *args, **kwargs):
-        """
-        Introduce variables. n states (Including the first and last) therefore, n+1 states.
-        """
         self.states : list[State] = []
 
-        # iterate from 0 (initial) to n (final)
-        for i in range(self.number_of_states + 1):
+        for i in range(self.number_of_states):
             idx = str(i)
             state = State(
-                SX.sym("x" + idx), SX.sym("y" + idx), SX.sym("th" + idx),
-                SX.sym("v" + idx), SX.sym("phi" + idx), SX.sym("t" + idx)
+                SX.sym("x"+idx), SX.sym("y" + idx),
+                SX.sym("th" + idx), SX.sym("t" + idx)
             )
             for _, value in asdict(state).items():
                 self.set_variable(value.name(), value)
@@ -50,71 +56,50 @@ class DubinCar(Problem):
         self.set_equality_constraint("yi", X0.y, init.y)
         self.set_equality_constraint("thi", X0.theta, init.th)
 
-        self.set_equality_constraint("xf", Xn.x, final.x, 0.2)
-        self.set_equality_constraint("yf", Xn.y, final.y, 0.2)
+        # TODO : Add tolerances here
+        self.set_equality_constraint("xf", Xn.x, final.x)
+        self.set_equality_constraint("yf", Xn.y, final.y)
         self.set_equality_constraint("thf", Xn.theta, final.th)
 
-        # Kinematic Constraints
+        for i in range(self.number_of_states - 1):
+            idx = str(i); Xi = self.states[i]; Xip1 = self.states[i+1]
 
-        # Initial Conditions: start at rest and t = 0
-        self.set_equality_constraint("vi", X0.v, 0)
-        self.set_equality_constraint("phii", X0.phi, 0)
-        self.set_equality_constraint("ti", X0.t, 0)
+            # Time Constraint
+            # It is allowed for a state to take upto dt_max seconds to transition
+            self.set_constraint("t"+idx, Xi.t, 0, self.dt_max)
 
-        # Final Conditions: stop to rest
-        self.set_equality_constraint("vf", Xn.v, 0)
-        self.set_equality_constraint("phif", Xn.phi, 0)
+            # Bicycle Model Constraint
+            dy = Xip1.y - Xi.y; dx = Xip1.x - Xi.x; dth = Xip1.theta - Xi.theta
+            self.set_equality_constraint(
+                "cycle"+idx,
+                dy*(cos(Xip1.theta) + cos(Xi.theta)) - dx*(sin(Xip1.theta) + sin(Xi.theta)),
+                0
+            )
 
-        # Set kinematics between each state according to simple car
-        # https://msl.cs.uiuc.edu/planning/node658.html
-        for i in range(1, self.number_of_states+1):
-            idx = str(i)
-            Xi = self.states[i]; Xi_1 = self.states[i-1]
+            # Curvature Constraint
+            di2 = power(dy, 2) + power(dx, 2)
+            pi2 = di2/power(2*sin(dth/2), 2)
+            ri2 = di2/dth
 
-            # Physical and mathematical constraints
+            self.set_constraint(
+                "curvature"+idx,
+                ri2, power(self.minimum_turning_radius, 2)
+            )
 
-            self.set_constraint("t"+idx, Xi.t, 0)
-            self.set_constraint("th_kin"+idx, Xi.theta, -pi, pi)
-            self.set_constraint("v_max"+idx, Xi.v, 0, self.max_linear_velocity)
-            self.set_constraint("phi_max"+idx, Xi.phi, -self.max_steering_angle, self.max_steering_angle)
+            # Velocity Constraints
+            self.set_constraint(
+                "velocity"+idx,
+                (pi2*power(dth, 2))/power(Xi.t, 2),
+                0, power(self.max_linear_velocity, 2)
+            )
 
-            # Bicycle model
-
-            dt = Xi.t - Xi_1.t
-
-            dx = Xi.x - Xi_1.x
-            dy = Xi.y - Xi_1.y
-            dth = Xi.theta - Xi_1.theta
-
-            self.set_equality_constraint("cycle"+idx, dy*(cos(Xi_1.theta)+cos(Xi.theta)) - dx*(sin(Xi_1.theta)+sin(Xi.theta)), 0)
-            self.set_constraint("dt"+idx, dt, 0, 2) # s
-
-            # Velocity and Steering Angle constraints
-
-            d = power(dx, 2) + power(dy, 2)
-
-            self.set_equality_constraint("v"+idx, d - power(Xi.v, 2)*power(dt, 2), 0)
-            self.set_equality_constraint("phi"+idx, atan2(dth*self.wheel_base, Xi.v*dt) - Xi.phi, 0)
-
-            # Curvature Constraints
-
-            p = self.wheel_base/tan(Xn.phi)
-            self.set_constraint("p_max"+idx, p - self.minimum_turning_radius, 0)
-
-            # Acceleration Constraints
-
-            if (i - 2 >= 0):
-                Xi_2 = self.states[i-2]
-                dt_1 = Xi_1.t - Xi_2.t
-                a = (2*(Xi.v - Xi_1.v))/(dt + dt_1)
-                self.set_constraint("a"+idx, a, 0, self.max_acceleration)
-
-        # Time Constraints
-        time_sum = 0
-        for i in range(0, len(self.states) - 1):
-            time_sum += (self.states[i+1].t - self.states[i].t)
-
-        self.set_equality_constraint("time_sum", time_sum - Xn.t + X0.t, 0)
+            # if i + 2 <= self.number_of_states - 1 and i - 2 <= 0:
+            #     # vi = 
+            #     # ai = (2*(Xip1.v - Xi.v))/(Xip1.t + Xi.t)
+            #     self.set_constraint(
+            #         "acceleration"+idx,
+            #         ai, 0, self.max_acceleration
+            #     )                
 
     def objective(self, *args, **kwargs):
         ##### Minimize Path Length
@@ -129,9 +114,9 @@ class DubinCar(Problem):
 
         ##### Minimize time of trajectory
         # time_squared_sum = 0
-        # for i in range(0, len(self.states) - 1):
-        #     time_squared_sum += power((self.states[i+1].t - self.states[i].t), 2)
-        
+        # for state in self.states:
+        #     time_squared_sum += power(state.t, 2)
+
         # return time_squared_sum
 
     def initial_guess(self, *args, **kwargs):
@@ -182,7 +167,7 @@ if __name__ == "__main__":
 
     ex = Executor(dc)
     ex.prep(init=init, final=final)
-    solution, solver = ex.solve(warm_start=True, warming_iterations=3)
+    solution, solver = ex.solve()
     decision_variables = solution["x"]
 
     import matplotlib.pyplot as plt
@@ -192,16 +177,15 @@ if __name__ == "__main__":
 
     note_phi = []
 
-    for i in range(0, decision_variables.shape[0], 6):
+    for i in range(0, decision_variables.shape[0], 4):
         x = decision_variables[i]; y = decision_variables[i+1]; th = decision_variables[i+2]
-        v = decision_variables[i+3]; phi = decision_variables[i+4]; t = decision_variables[i+5]
+        t = decision_variables[i+3]
 
-        print(x, y, th, v, phi, t)
+        print(x, y, th, t)
 
         note_x.append(float(x))
         note_y.append(float(y))
-        
-        note_phi.append(float(phi))
+        note_phi.append(float(th))
 
 
     plt.plot(note_x, note_y)

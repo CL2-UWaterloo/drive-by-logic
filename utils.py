@@ -10,19 +10,6 @@ class Coords2D:
     th : float | SX
 
 @dataclass
-class State:
-    x : SX
-    y : SX
-    # Heading Angle
-    theta : SX
-    # Speed applied at previous state -> Instantaneous Speed
-    v : SX
-    # Steering angle input applied at previous state
-    phi : SX
-    # Time elapsed from t=0
-    t : SX
-
-@dataclass
 class CarLikeRobot:
     minimum_turning_radius : float
     wheel_base : float
@@ -51,3 +38,9 @@ class LimoBot(CarLikeRobot):
     wheel_base : float = 0.2 # m
     max_linear_velocity : float = 1 # m/s
     max_acceleration : float = 0.5 # m/s^2
+
+
+def normalize_angle(x):
+    x = fmod(x + pi, 2*pi)
+    factor = if_else(x < 0, pi, -pi)
+    return x + factor
