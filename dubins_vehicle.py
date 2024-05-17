@@ -9,10 +9,11 @@ from casadi import *
 
 @dataclass
 class State:
-    x : SX
-    y : SX
-    theta : SX
-    t : SX
+    x : SX | float
+    y : SX | float
+    theta : SX | float
+    sigma : SX | float
+    t : SX | float
 
 class DubinCar(Problem):
 
@@ -22,7 +23,7 @@ class DubinCar(Problem):
         self.prep_robot_information()
 
         # Formulation Parameters
-        self.number_of_states = 5
+        self.number_of_states = 4
         self.dt_max = 3 # s
 
     def prep_robot_information(self):
@@ -38,8 +39,8 @@ class DubinCar(Problem):
         for i in range(self.number_of_states):
             idx = str(i)
             state = State(
-                SX.sym("x"+idx), SX.sym("y" + idx),
-                SX.sym("th" + idx), SX.sym("t" + idx)
+                SX.sym("x"+idx), SX.sym("y" + idx), SX.sym("th" + idx),
+                SX.sym("s" + idx), SX.sym("t" + idx)
             )
             for _, value in asdict(state).items():
                 self.set_variable(value.name(), value)
@@ -52,54 +53,29 @@ class DubinCar(Problem):
         X0 = self.states[0]; Xn = self.states[-1]
 
         # Boundary Conditions
-        self.set_equality_constraint("xi", X0.x, init.x)
-        self.set_equality_constraint("yi", X0.y, init.y)
-        self.set_equality_constraint("thi", X0.theta, init.th)
+        self.set_equality_constraint("x0", X0.x, init.x)
+        self.set_equality_constraint("y0", X0.y, init.y)
+        self.set_equality_constraint("th0", X0.theta, init.th)
 
         # TODO : Add tolerances here
-        self.set_equality_constraint("xf", Xn.x, final.x)
-        self.set_equality_constraint("yf", Xn.y, final.y)
-        self.set_equality_constraint("thf", Xn.theta, final.th)
+        self.set_equality_constraint("xn", Xn.x, final.x)
+        self.set_equality_constraint("yn", Xn.y, final.y)
+        self.set_equality_constraint("thn", Xn.theta, final.th)
 
-        for i in range(self.number_of_states - 1):
-            idx = str(i); Xi = self.states[i]; Xip1 = self.states[i+1]
+        k = 1/self.minimum_turning_radius
+        v = 1
 
-            # Time Constraint
-            # It is allowed for a state to take upto dt_max seconds to transition
-            self.set_constraint("t"+idx, Xi.t, 0, self.dt_max)
+        for i in range(1, self.number_of_states):
+            idx = str(i)
+            Xi = self.states[i]; Xim1 = self.states[i-1]
 
-            # Bicycle Model Constraint
-            dy = Xip1.y - Xi.y; dx = Xip1.x - Xi.x; dth = Xip1.theta - Xi.theta
-            self.set_equality_constraint(
-                "cycle"+idx,
-                dy*(cos(Xip1.theta) + cos(Xi.theta)) - dx*(sin(Xip1.theta) + sin(Xi.theta)),
-                0
-            )
+            self.set_constraint("t"+idx, Xi.t, 0)
+            self.set_constraint("s"+idx, Xi.sigma, -1, 1)
 
-            # Curvature Constraint
-            di2 = power(dy, 2) + power(dx, 2)
-            pi2 = di2/power(2*sin(dth/2), 2)
-            ri2 = di2/dth
-
-            self.set_constraint(
-                "curvature"+idx,
-                ri2, power(self.minimum_turning_radius, 2)
-            )
-
-            # Velocity Constraints
-            self.set_constraint(
-                "velocity"+idx,
-                (pi2*power(dth, 2))/power(Xi.t, 2),
-                0, power(self.max_linear_velocity, 2)
-            )
-
-            # if i + 2 <= self.number_of_states - 1 and i - 2 <= 0:
-            #     # vi = 
-            #     # ai = (2*(Xip1.v - Xi.v))/(Xip1.t + Xi.t)
-            #     self.set_constraint(
-            #         "acceleration"+idx,
-            #         ai, 0, self.max_acceleration
-            #     )                
+            arc_phase = Xi.sigma*k*v*Xi.t*0.5
+            self.set_equality_constraint("x"+idx, Xi.x - Xim1.x - v*Xi.t*sinc(arc_phase)*cos(Xim1.theta + arc_phase), 0)
+            self.set_equality_constraint("y"+idx, Xi.y - Xim1.y - v*Xi.t*sinc(arc_phase)*sin(Xim1.theta + arc_phase), 0)
+            self.set_equality_constraint("th"+idx, Xi.theta - Xim1.theta - 2*arc_phase, 0)
 
     def objective(self, *args, **kwargs):
         ##### Minimize Path Length
@@ -160,7 +136,7 @@ class DubinCar(Problem):
 
 if __name__ == "__main__":
     init = Coords2D(0.0, 0.0, 0.0)
-    final = Coords2D(1.0, 1.0, 0.0)
+    final = Coords2D(0.0, 10.0, 0.0)
 
     lm = LimoBot()
     dc = DubinCar(lm)
@@ -172,21 +148,44 @@ if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
 
+    states : list[State] = []
+
+    for i in range(0, decision_variables.shape[0], 5):
+        x = decision_variables[i]; y = decision_variables[i+1]; th = decision_variables[i+2]
+        s = decision_variables[i+3]; t = decision_variables[i+4]
+
+        print(x, y, th, s, t)
+
+        states.append(
+            State(
+                float(x), float(y), float(th),
+                float(s), float(t)
+            )
+        )
+
     note_x = []
     note_y = []
 
-    note_phi = []
+    m = 10
+    v = 1
+    k = 1/lm.minimum_turning_radius
 
-    for i in range(0, decision_variables.shape[0], 4):
-        x = decision_variables[i]; y = decision_variables[i+1]; th = decision_variables[i+2]
-        t = decision_variables[i+3]
+    prev_state : State = None
+    for state in states:
+        if not prev_state:
+            prev_state = state
+            continue
 
-        print(x, y, th, t)
+        for i in range(m + 1):
+            t = (i/m)*state.t
+            arc_phase = state.sigma*k*v*0.5
+            x = prev_state.x + v*t*sinc(arc_phase*t)*cos(prev_state.theta+arc_phase*t)
+            y = prev_state.y + v*t*sinc(arc_phase*t)*sin(prev_state.theta+arc_phase*t)
 
-        note_x.append(float(x))
-        note_y.append(float(y))
-        note_phi.append(float(th))
+            note_x.append(x)
+            note_y.append(y)
 
+        prev_state = state
 
     plt.plot(note_x, note_y)
     plt.show()

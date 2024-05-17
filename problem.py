@@ -11,6 +11,8 @@ class Problem:
 
         self.constraints = {} # name : [g, lbg, ubg]
 
+        self.obstacles = []
+
     ##### DS for constraints, parameters, and variables
 
     def set_constraint(self, name, exp, lbg=-DM_inf(), ubg=DM_inf()):
@@ -49,6 +51,12 @@ class Problem:
 
     def get_defined_parameters(self, name):
         return self.defined_parameters[name]
+
+    def set_obstacle(self, x, y, r):
+        self.obstacles.append((x, y, r))
+
+    def get_obstacles(self):
+        return self.obstacles
 
     ##### Abstract Functions
 

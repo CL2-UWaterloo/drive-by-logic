@@ -39,8 +39,16 @@ class LimoBot(CarLikeRobot):
     max_linear_velocity : float = 1 # m/s
     max_acceleration : float = 0.5 # m/s^2
 
-
 def normalize_angle(x):
     x = fmod(x + pi, 2*pi)
     factor = if_else(x < 0, pi, -pi)
     return x + factor
+
+def sinc(x : SX | float):
+    if type(x) == SX:
+        return if_else(x != 0, sin(x)/x, 1)
+    else:
+        if abs(x) < 1e-20:
+            return 1
+        else:
+            return sin(x)/x
