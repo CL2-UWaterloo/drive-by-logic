@@ -1,3 +1,1 @@
-0. Reorg code and papers with a more structured approach
-1. Run optimizer based approach and Sampling based approach on Simulation. 1 Day
-2. MINLP Formulation. 2 Days
+1. Get a working impl for obstacles

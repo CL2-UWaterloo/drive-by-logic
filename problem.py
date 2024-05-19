@@ -31,6 +31,14 @@ class Problem:
 
         return g, lbg, ubg
 
+    def get_constraint_idx_by_pattern(self, pattern):
+        idx = 0; ret = []
+        for name in self.constraints.keys():
+            if pattern in name:
+                ret.append(idx)
+            idx += 1
+        return ret
+
     def set_variable(self, name, obj = None):
         if obj != None:
             self.variables[name] = obj
@@ -51,12 +59,6 @@ class Problem:
 
     def get_defined_parameters(self, name):
         return self.defined_parameters[name]
-
-    def set_obstacle(self, x, y, r):
-        self.obstacles.append((x, y, r))
-
-    def get_obstacles(self):
-        return self.obstacles
 
     ##### Abstract Functions
 
