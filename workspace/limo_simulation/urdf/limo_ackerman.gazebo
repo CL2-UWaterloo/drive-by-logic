@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<robot name="limo_ackerman" xmlns:xacro="http://ros.org/wiki/xacro">
+    <gazebo>
+        <plugin filename="ignition-gazebo-joint-state-publisher-system" name="ignition::gazebo::systems::JointStatePublisher">
+        </plugin>
+        <plugin filename="gz-sim-ackermann-steering-system" name="gz::sim::systems::AckermannSteering">
+            <left_joint>front_left_wheel</left_joint>
+            <left_joint>rear_left_wheel</left_joint>
+            <right_joint>front_right_wheel</right_joint>
+            <right_joint>rear_right_wheel</right_joint>
+            <left_steering_joint>left_steering_hinge_wheel</left_steering_joint>
+            <right_steering_joint>right_steering_hinge_wheel</right_steering_joint>
+            <kingpin_width>0.14</kingpin_width>
+            <steering_limit>0.5235</steering_limit> <!--   double minimumTurningRadius = this->wheelBase / sin(this->steeringLimit); -->
+            <wheel_base>0.2</wheel_base>
+            <wheel_separation>0.172</wheel_separation>
+            <wheel_radius>0.045</wheel_radius>
+            <min_velocity>-1</min_velocity> <!-- Dubin's car immitation -->
+            <max_velocity>1</max_velocity>
+            <min_acceleration>-0.5</min_acceleration>
+            <max_acceleration>0.5</max_acceleration> <!-- Approximate value -->
+            <topic>/cmd_vel</topic>
+        </plugin>
+    </gazebo>
+</robot>
