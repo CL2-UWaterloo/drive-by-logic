@@ -49,7 +49,7 @@ class DubinCar(Problem):
 
         self.granularity = 5
 
-        self.t_max = 40 # s
+        self.t_max = 20 # s
 
     def prep_robot_information(self):
         self.minimum_turning_radius = self.robot.get_minimum_turning_radius()
