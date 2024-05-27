@@ -34,7 +34,7 @@
         <visual>
             <origin xyz="0 0 -0.15" rpy="0 0 1.57" />
             <geometry>
-                <mesh filename="file://$(find limo_simulation)/meshes/limo_base.dae" scale="1 1 1"/>
+                <mesh filename="file://$(find limo_simulation)/meshes/limo_base.stl" scale="0.001 0.001 0.001"/>
             </geometry>
         </visual>
         <collision>
@@ -90,7 +90,7 @@
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
             <geometry>
-                <mesh filename="file://$(find limo_simulation)/meshes/limo_wheel.dae" />
+                <mesh filename="file://$(find limo_simulation)/meshes/limo_wheel.stl" scale="0.001 0.001 0.001"/>
             </geometry>
         </visual>
         <collision>
@@ -116,7 +116,7 @@
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
             <geometry>
-                <mesh filename="file://$(find limo_simulation)/meshes/limo_wheel.dae" />
+                <mesh filename="file://$(find limo_simulation)/meshes/limo_wheel.stl" scale="0.001 0.001 0.001"/>
             </geometry>
         </visual>
         <collision>

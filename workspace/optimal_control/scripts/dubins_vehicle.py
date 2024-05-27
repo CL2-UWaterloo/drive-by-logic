@@ -17,25 +17,21 @@ class State:
 
     # Below information encodes how the robot got to this state
     # Formulation inspired from: https://ieeexplore.ieee.org/document/9143597
-
-    # Segment 1
-    s0 : SX | float
-    t0 : SX | float
-    
-    # Segment 2
-    s1 : SX | float
-    t1 : SX | float
-
-    # Segment 3
-    s2 : SX | float
-    t2 : SX | float
+    s : SX | float
+    t : SX | float
 
     # Velocity and Curvature
     # To imitate Dubin's formulation of a car, the velocity and curvature are constant
     v : SX | float
     k : SX | float
 
-# TODO: Should obstacle checking be in terms of forward kinematics of the car model?
+    @staticmethod
+    def from_list(input : list[float | DM]):
+        return State(
+            float(input[0]), float(input[1]), float(input[2]),
+            float(input[3]), float(input[4]), float(input[5]),
+            float(input[6])
+        )
 
 class DubinCar(Problem):
 
@@ -47,7 +43,7 @@ class DubinCar(Problem):
         # Formulation Parameters
         self.number_of_states = 3
 
-        self.granularity = 5
+        self.granularity = 20
 
         self.t_max = 20 # s
 
@@ -66,16 +62,14 @@ class DubinCar(Problem):
 
         for i in range(self.number_of_states):
             idx = str(i)
-            
+
             # Make State
             state = State(
                 SX.sym("x"+idx), SX.sym("y"+idx), SX.sym("th"+idx),
-                SX.sym("s0"+idx), SX.sym("t0"+idx),
-                SX.sym("s1"+idx), SX.sym("t1"+idx),
-                SX.sym("s2"+idx), SX.sym("t2"+idx),
+                SX.sym("s"+idx), SX.sym("t"+idx),
                 SX.sym("v"+idx), SX.sym("k"+idx)
             )
-            
+
             # Declare Decision Variables
             for _, value in asdict(state).items():
                 self.set_variable(value.name(), value)
@@ -137,59 +131,38 @@ class DubinCar(Problem):
                 "k"+idx, Xi.k, 0, self.k
             )
 
-            # Smoothness Constraint
-            # self.set_constraint(
-            #     "k_dot"+idx, Xi.k - Xim1.k, 0, 0.1
-            # )
-
             # Time Selection Constraint
             self.set_constraint(
-                "t0"+idx, Xi.t0, 0
-            )
-            self.set_constraint(
-                "t1"+idx, Xi.t1, 0
-            )
-            self.set_constraint(
-                "t2"+idx, Xi.t2, 0
+                "t"+idx, Xi.t, 0
             )
 
             # Sigma Selection Constraint
             self.set_constraint(
-                "s0"+idx, Xi.s0, -1, 1
-            )
-            self.set_constraint(
-                "s1"+idx, Xi.s1, -1, 1
-            )
-            self.set_constraint(
-                "s2"+idx, Xi.s2, -1, 1
+                "s"+idx, Xi.s, -1, 1
             )
 
             # Start with establishing the equality constraint between final and initial positions
             self.set_equality_constraint(
                 "x"+idx,
                 Xi.x - Xim1.x \
-                    - parametric_x(Xi.v*Xi.t0, Xi.k*Xi.s0, Xim1.theta) \
-                    - parametric_x(Xi.v*Xi.t1, Xi.k*Xi.s1, Xim1.theta + Xi.k*Xi.s0*Xi.v*Xi.t0) \
-                    - parametric_x(Xi.v*Xi.t2, Xi.k*Xi.s2, Xim1.theta + Xi.k*Xi.s0*Xi.v*Xi.t0 + Xi.k*Xi.s1*Xi.v*Xi.t1),
+                    - parametric_x(Xi.v*Xi.t, Xi.k*Xi.s, Xim1.theta),
                 0
             )
 
             self.set_equality_constraint(
                 "y"+idx,
                 Xi.y - Xim1.y \
-                    - parametric_y(Xi.v*Xi.t0, Xi.k*Xi.s0, Xim1.theta) \
-                    - parametric_y(Xi.v*Xi.t1, Xi.k*Xi.s1, Xim1.theta + Xi.k*Xi.s0*Xi.v*Xi.t0) \
-                    - parametric_y(Xi.v*Xi.t2, Xi.k*Xi.s2, Xim1.theta + Xi.k*Xi.s0*Xi.v*Xi.t0 + Xi.k*Xi.s1*Xi.v*Xi.t1),
+                    - parametric_y(Xi.v*Xi.t, Xi.k*Xi.s, Xim1.theta),
                 0
             )
 
             self.set_equality_constraint(
                 "th"+idx,
-                Xi.theta - Xim1.theta - Xi.k*Xi.s0*Xi.v*Xi.t0 - Xi.k*Xi.s1*Xi.v*Xi.t1 - Xi.k*Xi.s2*Xi.v*Xi.t2,
+                Xi.theta - Xim1.theta - Xi.k*Xi.s*Xi.v*Xi.t,
                 0
             )
 
-            time_sum += (Xi.t0 + Xi.t1 + Xi.t2)
+            time_sum += Xi.t
 
         self.set_constraint("time_sum", time_sum, 0, self.t_max)
 
@@ -207,44 +180,22 @@ class DubinCar(Problem):
                 v = Xi.v,
                 k = Xi.k,
                 n = self.granularity,
-                s = Xi.s0,
-                t = Xi.t0
+                s = Xi.s,
+                t = Xi.t
             )
-
-            # Second Segment Trajectory
-            Xim1_fine.extend(self.trajectory(
-                # Start from last state of previously generated trajectory
-                state = Xim1_fine[-1],
-                v = Xi.v,
-                k = Xi.k,
-                n = self.granularity,
-                s = Xi.s1,
-                t = Xi.t1
-            ))
-
-            # Third Segment Trajectory
-            Xim1_fine.extend(self.trajectory(
-                state = Xim1_fine[-1],
-                v = Xi.v,
-                k = Xi.k,
-                n = self.granularity,
-                s = Xi.s2,
-                t = Xi.t2
-            ))
 
             # Ensure to add each state into constraint dict to extract values during inference
             traj_id = 0
             for intermediate_state in Xim1_fine:
                 traj_idx = state_idx + str(traj_id)
-                self.set_constraint(
-                    "intermediate_x"+traj_idx,
-                    intermediate_state.x
-                )
-                self.set_constraint(
-                    "intermediate_y"+traj_idx,
-                    intermediate_state.y
-                )
                 
+                # Result Collection from solver
+                for key, value in asdict(intermediate_state).items():
+                    self.set_constraint(
+                        "intermediate_"+key+traj_idx,
+                        value
+                    )
+
                 # Check for any obstacle avoidance here
                 obs_id = 0
                 for obstacle in self.obstacles:
@@ -277,9 +228,8 @@ class DubinCar(Problem):
             dy = state.y + v*dt*sinc(arc_phase*dt)*sin(state.theta+arc_phase*dt)
             dth = state.theta + 2*arc_phase*dt
 
-            # All redundant values are set to 0
             trajectory.append(State(
-                dx, dy, dth, 0, 0, 0, 0, 0, 0, 0, 0
+                dx, dy, dth, s, dt, v, k
             ))
 
         return trajectory
@@ -343,7 +293,7 @@ if __name__ == "__main__":
 
     # X, Y, R -> Circular Obstacles
     obstacles = [
-        [5.0, 5.0, 2.0, 1.0]
+        [5.0, 5.0, 1.0, 1.0]
     ]
 
     lm = LimoBot()
@@ -359,13 +309,15 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
 
+    # Plot trajectory as imagined by the obstacle avoidance check
     intermediate_values = dc.get_constraint_idx_by_pattern("intermediate")
-
-    note_x = []; note_y = []
-
-    for i in range(0, len(intermediate_values), 2):
+    note_x = []; note_y = []; note_th = []
+    for i in range(0, len(intermediate_values), 7):
         x_idx = intermediate_values[i]; y_idx = intermediate_values[i+1]
         note_x.append(float(constraints[x_idx])); note_y.append(float(constraints[y_idx]))
+
+        th_idx = intermediate_values[i+2]
+        note_th.append(float(constraints[th_idx]))
 
     fig, ax = plt.subplots()
 
@@ -380,8 +332,46 @@ if __name__ == "__main__":
             linewidth=1, edgecolor='r', facecolor='none'
         ))
 
-    ax.plot(note_x, note_y)
+    for i in range(len(note_x)):
+        ax.arrow(
+            note_x[i], note_y[i],
+            0.1*cos(note_th[i]),
+            0.1*sin(note_th[i]),
+            head_width=0.1
+        )
+
     plt.show()
 
-    # Generating Control Sequences from State Matrices
-    # Control Sequences should be {(v1, w1), ..., (vn, wn)}, S.T. the dt between each control sequence is of a fixed time period.
+    # Generating Control Sequences from States
+    previous = None; commands = []; dt = 0.1
+    for i in range(0, decision_variables.shape[0], 7):
+        # Get all the information
+        current = State.from_list(decision_variables[i:i+7])
+
+        # First Iteration
+        if previous == None:
+            previous = current
+            continue
+
+        time_elapsed = 0
+        while time_elapsed < current.t:
+            commands.append(
+                [
+                    current.v,
+                    current.s*current.k*current.v
+                ]
+            )
+            time_elapsed += dt
+
+    # Stop after executing commands
+    commands.append([0.0, 0.0])
+
+    import rclpy
+    rclpy.init()
+
+    ros_interface = TwistPublisher(dt, commands)
+    while ros_interface.index < len(commands):
+        rclpy.spin_once(ros_interface)
+
+    ros_interface.destroy_node()
+    rclpy.shutdown()
