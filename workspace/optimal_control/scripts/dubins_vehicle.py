@@ -7,6 +7,8 @@ from optimal_control.executor import Executor
 from dataclasses import dataclass, asdict
 from casadi import *
 
+from sys import argv
+
 # TODO: Refactor Name from state to anything else
 @dataclass
 class State:
@@ -41,11 +43,11 @@ class DubinCar(Problem):
         self.prep_robot_information()
 
         # Formulation Parameters
-        self.number_of_states = 3
+        self.number_of_states = 4
 
-        self.granularity = 20
+        self.granularity = 10
 
-        self.t_max = 20 # s
+        self.t_max = 40 # s
 
     def prep_robot_information(self):
         self.minimum_turning_radius = self.robot.get_minimum_turning_radius()
@@ -118,7 +120,7 @@ class DubinCar(Problem):
 
             # Velocity Selection Constraint
             self.set_constraint(
-                "v"+idx, Xi.v, 0, self.max_linear_velocity
+                "v"+idx, Xi.v, 0, self.v
             )
 
             # Acceleration Constraint
@@ -301,77 +303,79 @@ if __name__ == "__main__":
 
     ex = Executor(dc)
     ex.prep(init=init, final=final, obstacles=obstacles)
-    solution, solver = ex.solve()
-    
+    solution, solver = ex.solve(warming_iterations=2)
+
     decision_variables = solution["x"]
     constraints = solution["g"]
 
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as patches
+    if "plot" in argv:
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as patches
 
-    # Plot trajectory as imagined by the obstacle avoidance check
-    intermediate_values = dc.get_constraint_idx_by_pattern("intermediate")
-    note_x = []; note_y = []; note_th = []
-    for i in range(0, len(intermediate_values), 7):
-        x_idx = intermediate_values[i]; y_idx = intermediate_values[i+1]
-        note_x.append(float(constraints[x_idx])); note_y.append(float(constraints[y_idx]))
+        # Plot trajectory as imagined by the obstacle avoidance check
+        intermediate_values = dc.get_constraint_idx_by_pattern("intermediate")
+        note_x = []; note_y = []; note_th = []
+        for i in range(0, len(intermediate_values), 7):
+            x_idx = intermediate_values[i]; y_idx = intermediate_values[i+1]
+            note_x.append(float(constraints[x_idx])); note_y.append(float(constraints[y_idx]))
 
-        th_idx = intermediate_values[i+2]
-        note_th.append(float(constraints[th_idx]))
+            th_idx = intermediate_values[i+2]
+            note_th.append(float(constraints[th_idx]))
 
-    fig, ax = plt.subplots()
+        fig, ax = plt.subplots()
 
-    for obstacle in obstacles:
-        ax.add_patch(patches.Circle(
-            (obstacle[0], obstacle[1]), obstacle[2],
-            linewidth=1, edgecolor='r', facecolor='none'
-        ))
+        for obstacle in obstacles:
+            ax.add_patch(patches.Circle(
+                (obstacle[0], obstacle[1]), obstacle[2],
+                linewidth=1, edgecolor='r', facecolor='none'
+            ))
 
-        ax.add_patch(patches.Circle(
-            (obstacle[0], obstacle[1]), obstacle[2]+obstacle[3],
-            linewidth=1, edgecolor='r', facecolor='none'
-        ))
+            ax.add_patch(patches.Circle(
+                (obstacle[0], obstacle[1]), obstacle[2]+obstacle[3],
+                linewidth=1, edgecolor='r', facecolor='none'
+            ))
 
-    for i in range(len(note_x)):
-        ax.arrow(
-            note_x[i], note_y[i],
-            0.1*cos(note_th[i]),
-            0.1*sin(note_th[i]),
-            head_width=0.1
-        )
-
-    plt.show()
-
-    # Generating Control Sequences from States
-    previous = None; commands = []; dt = 0.1
-    for i in range(0, decision_variables.shape[0], 7):
-        # Get all the information
-        current = State.from_list(decision_variables[i:i+7])
-
-        # First Iteration
-        if previous == None:
-            previous = current
-            continue
-
-        time_elapsed = 0
-        while time_elapsed < current.t:
-            commands.append(
-                [
-                    current.v,
-                    current.s*current.k*current.v
-                ]
+        for i in range(len(note_x)):
+            ax.arrow(
+                note_x[i], note_y[i],
+                0.1*cos(note_th[i]),
+                0.1*sin(note_th[i]),
+                head_width=0.1
             )
-            time_elapsed += dt
 
-    # Stop after executing commands
-    commands.append([0.0, 0.0])
+        plt.show()
 
-    import rclpy
-    rclpy.init()
+    if "post" in argv:
+        # Generating Control Sequences from States
+        previous = None; commands = []; dt = 0.1
+        for i in range(0, decision_variables.shape[0], 7):
+            # Get all the information
+            current = State.from_list(decision_variables[i:i+7])
 
-    ros_interface = TwistPublisher(dt, commands)
-    while ros_interface.index < len(commands):
-        rclpy.spin_once(ros_interface)
+            # First Iteration
+            if previous == None:
+                previous = current
+                continue
 
-    ros_interface.destroy_node()
-    rclpy.shutdown()
+            time_elapsed = 0
+            while time_elapsed < current.t:
+                commands.append(
+                    [
+                        current.v,
+                        current.s*current.k*current.v
+                    ]
+                )
+                time_elapsed += dt
+
+        # Stop after executing commands
+        commands.append([0.0, 0.0])
+
+        import rclpy
+        rclpy.init()
+
+        ros_interface = TwistPublisher(dt, commands)
+        while ros_interface.index < len(commands):
+            rclpy.spin_once(ros_interface)
+
+        ros_interface.destroy_node()
+        rclpy.shutdown()

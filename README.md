@@ -27,3 +27,7 @@ TermB:
 ./scripts/deploy/devel.sh
 ros2 launch limo_simulation limo.launch.py
 ```
+
+## Drawbacks
+
+1. 
