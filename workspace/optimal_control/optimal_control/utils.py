@@ -7,10 +7,37 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 
 @dataclass
-class Coords2D:
-    x : float | SX
-    y : float | SX
-    th : float | SX
+class State:
+    # Position Information
+    x : SX | float
+    y : SX | float
+    theta : SX | float
+
+    # Below information encodes how the robot got to this state
+    # Formulation inspired from: https://ieeexplore.ieee.org/document/9143597
+    s : SX | float
+    t : SX | float
+
+    # Velocity and Curvature
+    # To imitate Dubin's formulation of a car, the velocity and curvature are constant
+    v : SX | float
+    k : SX | float
+
+    @staticmethod
+    def from_list(input : list[float | DM]):
+        return State(
+            float(input[0]), float(input[1]), float(input[2]),
+            float(input[3]), float(input[4]), float(input[5]),
+            float(input[6])
+        )
+
+    def __init__(self, *args, **kwargs):
+        if len(args) == 3:
+            self.x = args[0]; self.y = args[1]; self.theta = args[2]
+        else:
+            self.x = args[0]; self.y = args[1]; self.theta = args[2]
+            self.s = args[3]; self.t = args[4]; self.v = args[5]
+            self.k = args[6]
 
 @dataclass
 class CarLikeRobot:

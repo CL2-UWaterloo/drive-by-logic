@@ -11,7 +11,8 @@ install(DIRECTORY scripts
 )
 
 install(PROGRAMS
-    scripts/dubins_vehicle.py
+    scripts/planner.py
+    scripts/testbed.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
