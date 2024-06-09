@@ -19,7 +19,7 @@ For deploy:
 TermA:
 ```bash
 ./scripts/deploy/devel.sh
-ros2 run optimal_control dubins_vehicle.py
+ros2 run optimal_control planner.py
 ```
 
 TermB:
@@ -30,4 +30,4 @@ ros2 launch limo_simulation limo.launch.py
 
 ## Drawbacks
 
-1. 
+1. Need to contrain rate of change of curvature.

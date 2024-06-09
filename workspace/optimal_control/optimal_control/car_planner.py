@@ -8,15 +8,15 @@ from optimal_control.problem import Problem
 
 class CarPlanner(Problem):
 
-    def __init__(self, robot : CarLikeRobot):
+    def __init__(self, robot : CarLikeRobot, number_of_states = 6, granularity = 10, t_max = 40):
         super(CarPlanner, self).__init__()
         self.robot = robot
         self.prep_robot_information()
 
         # Formulation Parameters
-        self.number_of_states = 6
-        self.granularity = 10
-        self.t_max = 40 # s
+        self.number_of_states = number_of_states
+        self.granularity = granularity
+        self.t_max = t_max # s
 
     def prep_robot_information(self):
         self.minimum_turning_radius = self.robot.get_minimum_turning_radius()
@@ -138,11 +138,11 @@ class CarPlanner(Problem):
         r = sqrt(
             power((self.final_state.x - self.initial_state.x), 2) \
             + power((self.final_state.y - self.initial_state.y), 2)
-        )
+        )*0.5
 
         k = 1/r
         x = self.initial_state.x; y = self.initial_state.y; theta = self.initial_state.theta
-        dt = self.t_max/self.number_of_states
+        t = (r*pi)/self.v; dt = t/self.number_of_states
         guess_variables = []
         for i in range(self.number_of_states):
             guess_variables.append(x)
@@ -153,10 +153,9 @@ class CarPlanner(Problem):
             guess_variables.append(self.v) # Unit Speed along the path
             guess_variables.append(k)
 
+            theta += self.v*k*dt
             x += self.v*cos(theta)*dt
             y += self.v*sin(theta)*dt
-            theta += self.v*k*dt
-            theta = normalize_angle(theta)
 
         return vertcat(*guess_variables)
 
@@ -171,7 +170,7 @@ class CarPlanner(Problem):
         opts = {
             "ipopt": {
                 "hessian_approximation": "limited-memory",
-                "max_iter": 5000
+                "max_iter": 1000
             },
             "jit": True,
             "compiler": "shell"

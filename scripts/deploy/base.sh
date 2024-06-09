@@ -12,7 +12,6 @@ run_docker() {
     --env="DISPLAY" \
     --env="QT_X11_NO_MITSHM=1" \
     -v $(dirname "$0")/app.sh:/root/app.sh \
-    -v /dev:/dev \
     $@
 }
 
