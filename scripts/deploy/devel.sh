@@ -11,16 +11,16 @@ mode="gpu"
 # declare sim, use sim by default
 sim="True"
 
-while getopts 'gsh' opt; do
+while getopts 'csh' opt; do
     case "$opt" in
-        g)
-            mode="gpu"
+        c)
+            mode="cpu"
             ;;
         s)
             sim="True"
             ;;
         ?|h)
-            echo "Usage: $(basename $0) [-g] [-s]"
+            echo "Usage: $(basename $0) [-c] [-s]"
             exit 1
             ;;
     esac

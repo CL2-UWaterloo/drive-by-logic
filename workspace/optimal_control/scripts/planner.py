@@ -7,7 +7,7 @@ from optimal_control.executor import Executor
 
 if __name__ == "__main__":
     init = State(0.0, 0.0, 0.0)
-    final = State(-10.0, -6.0, 0.0)
+    final = State(-2.0, -4.0, 0.0)
 
     # X, Y, R -> Circular Obstacles
     obstacles = [
@@ -23,8 +23,6 @@ if __name__ == "__main__":
     print(solver.stats()["success"], solver.stats()["t_proc_total"])
 
     decision_variables = solution["x"]; constraints = solution["g"]
-
-    print(decision_variables)
 
     if "plot" in argv:
         import matplotlib.pyplot as plt

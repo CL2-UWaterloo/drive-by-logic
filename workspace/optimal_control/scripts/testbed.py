@@ -14,7 +14,7 @@ if __name__ == "__main__":
     # ]
 
     lm = LimoBot()
-    dc = CarPlanner(lm, granularity=10, t_max=60)
+    dc = CarPlanner(lm, granularity=10)
 
     ex = Executor(dc)
     init = State(0.0, 0.0, 0.0)

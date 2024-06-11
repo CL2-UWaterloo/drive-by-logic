@@ -11,10 +11,10 @@ mode="gpu"
 # declare sim, use sim by default
 sim="True"
 
-while getopts 'gsh' opt; do
+while getopts 'csh' opt; do
     case "$opt" in
-        g)
-            mode="gpu"
+        c)
+            mode="cpu"
             ;;
         s)
             sim="True"
