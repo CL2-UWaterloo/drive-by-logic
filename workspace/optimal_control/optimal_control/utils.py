@@ -6,38 +6,14 @@ from casadi import *
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 
+from optimal_control.waypoint import Waypoint
+
+# Note: Not to be confused with optimization state, only used as syntax sugar
 @dataclass
 class State:
-    # Position Information
-    x : SX | float
-    y : SX | float
-    theta : SX | float
-
-    # Below information encodes how the robot got to this state
-    # Formulation inspired from: https://ieeexplore.ieee.org/document/9143597
-    s : SX | float
-    t : SX | float
-
-    # Velocity and Curvature
-    # To imitate Dubin's formulation of a car, the velocity and curvature are constant
-    v : SX | float
-    k : SX | float
-
-    @staticmethod
-    def from_list(input : list[float | DM]):
-        return State(
-            float(input[0]), float(input[1]), float(input[2]),
-            float(input[3]), float(input[4]), float(input[5]),
-            float(input[6])
-        )
-
-    def __init__(self, *args, **kwargs):
-        if len(args) == 3:
-            self.x = args[0]; self.y = args[1]; self.theta = args[2]
-        else:
-            self.x = args[0]; self.y = args[1]; self.theta = args[2]
-            self.s = args[3]; self.t = args[4]; self.v = args[5]
-            self.k = args[6]
+    x : float
+    y : float
+    theta : float
 
 @dataclass
 class CarLikeRobot:
@@ -61,6 +37,17 @@ class CarLikeRobot:
     def get_max_acceleration(self):
         return self.max_acceleration
 
+    def get_state_space(self, xnm1 : Waypoint, xn : Waypoint, dt : MX | float):
+        B = MX.zeros(xnm1.X.shape[0], xn.U.shape[0])
+
+        B[0, 0] = cos(xnm1.theta)*dt; B[0, 1] = 0.0
+        B[1, 0] = sin(xnm1.theta)*dt; B[1, 1] = 0.0
+        B[2, 0] = xnm1.k*dt; B[2, 1] = xn.v*(dt**2)
+        B[3, 0] = dt; B[3, 1] = 0.0
+
+        # MX.eye = Identity Matrix
+        return MX.eye(xnm1.X.shape[0]), B 
+
 # Limobot params https://github.com/agilexrobotics/limo-doc/blob/master/Limo%20user%20manual(EN).md#13-tech-specifications
 @dataclass
 class LimoBot(CarLikeRobot):
@@ -74,8 +61,8 @@ def normalize_angle(x):
     factor = if_else(x < 0, pi, -pi)
     return x + factor
 
-def sinc(x : SX | float):
-    if type(x) == SX:
+def sinc(x : MX | SX | float):
+    if type(x) == SX or type(x) == MX:
         return if_else(x != 0, sin(x)/x, 1)
     else:
         if abs(x) < 1e-20:
@@ -87,7 +74,7 @@ class TwistPublisher(Node):
 
     def __init__(self, dt, commands):
         super().__init__("twist_publisher")
-        self.publisher = self.create_publisher(Twist, "/cmd_vel", 10)        
+        self.publisher = self.create_publisher(Twist, "/cmd_vel", 10)
         self.commands = commands
         self.timer = self.create_timer(dt, self.callback)
         self.index = 0

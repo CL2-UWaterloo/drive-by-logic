@@ -8,13 +8,13 @@ from optimal_control.problem import Problem
 
 class CarPlanner(Problem):
 
-    def __init__(self, robot : CarLikeRobot, number_of_states = 6, granularity = 10, t_max = 40):
+    def __init__(self, robot : CarLikeRobot, number_of_waypoints = 6, granularity = 10, t_max = 40):
         super(CarPlanner, self).__init__()
         self.robot = robot
         self.prep_robot_information()
 
         # Formulation Parameters
-        self.number_of_states = number_of_states
+        self.number_of_waypoints = number_of_waypoints
         self.granularity = granularity
         self.t_max = t_max # s
 
@@ -29,32 +29,32 @@ class CarPlanner(Problem):
         self.v = self.max_linear_velocity*0.5
 
     def prep_problem(self, *args, **kwargs):
-        self.states : list[State] = []
+        self.waypoints : list[Waypoint] = []
 
-        for i in range(self.number_of_states):
+        for i in range(self.number_of_waypoints):
             idx = str(i)
 
-            # Make State
-            state = State(
-                SX.sym("x"+idx), SX.sym("y"+idx), SX.sym("theta"+idx),
-                SX.sym("s"+idx), SX.sym("t"+idx), SX.sym("v"+idx),
-                SX.sym("k"+idx)
+            # Make Waypoint
+            waypoint = Waypoint(
+                MX.sym("X"+idx, 4, 1),
+                MX.sym("U"+idx, 2, 1),
+                MX.sym("t"+idx, 1, 1)
             )
 
             # Declare Decision Variables
-            for _, value in asdict(state).items():
+            for _, value in asdict(waypoint).items():
                 self.set_variable(value.name(), value)
 
-            self.states.append(state)
+            self.waypoints.append(waypoint)
 
     def prep_constraints(self, *args, **kwargs):
-        # Get Initial, Final states, and Obstacles from arguments.
+        # Get Initial, Final waypoints, and Obstacles from arguments.
         self.initial_state : State = kwargs["init"]
         self.final_state : State = kwargs["final"]
         self.obstacles = kwargs["obstacles"]
 
         # The first state is X0 and the last is Xn
-        X0 = self.states[0]; Xn = self.states[-1]
+        X0 = self.waypoints[0]; Xn = self.waypoints[-1]
 
         # Boundary Conditions
         self.set_equality_constraint("x0", X0.x, self.initial_state.x)
@@ -68,11 +68,11 @@ class CarPlanner(Problem):
 
         # Iterate through all states to establish constraints
         time_sum = 0
-        for i in range(1, self.number_of_states):
+        for i in range(1, self.number_of_waypoints):
             idx = str(i)
 
             # Current state and previous state (Xim1 = Xi-1)
-            Xi = self.states[i]; Xim1 = self.states[i-1]
+            Xi = self.waypoints[i]; Xim1 = self.waypoints[i-1]
 
             # Velocity Constraint
             self.set_constraint("v"+idx, Xi.v, 0, self.v)
@@ -129,11 +129,11 @@ class CarPlanner(Problem):
             dx = stateB.x - stateA.x
             dy = stateB.y - stateA.y
             dth = stateB.theta - stateA.theta
-            return power(dx, 2) + power(dy, 2) + 2.77*(dth)
+            return power(dx, 2) + power(dy, 2)
 
         path_length = 0
-        for i in range(1, self.number_of_states):
-            path_length += length(self.states[i], self.states[i-1])
+        for i in range(1, self.number_of_waypoints):
+            path_length += length(self.waypoints[i], self.waypoints[i-1])
 
         return path_length
 
@@ -157,9 +157,9 @@ class CarPlanner(Problem):
 
         x = self.initial_state.x; y = self.initial_state.y; theta = self.initial_state.theta
         t = distance/self.v
-        dt = t/self.number_of_states
+        dt = t/self.number_of_waypoints
 
-        for i in range(self.number_of_states):
+        for i in range(self.number_of_waypoints):
             guess_variables.append(x)
             guess_variables.append(y)
             guess_variables.append(theta)
@@ -193,7 +193,8 @@ class CarPlanner(Problem):
                 "fast_step_computation": "yes"
             },
             "jit": True,
-            "compiler": "shell"
+            "compiler": "shell",
+            "expand": True
         }
 
         sol = nlpsol("Solver", "ipopt", nlp, opts)

@@ -7,12 +7,12 @@ from optimal_control.executor import Executor
 
 if __name__ == "__main__":
     init = State(0.0, 0.0, 0.0)
-    final = State(1.0, 0.2, 1.57)
+    final = State(-7.0, 7.0, 0.0)
 
     # X, Y, R -> Circular Obstacles
     obstacles = [
-        [5.0, 5.0, 1.0, 1.0],
-        [-5.0, 5.0, 1.0, 1.0]
+        [5.0, 5.0, 1.0, 0.3],
+        [-5.0, 5.0, 1.0, 0.3]
     ]
 
     lm = LimoBot()

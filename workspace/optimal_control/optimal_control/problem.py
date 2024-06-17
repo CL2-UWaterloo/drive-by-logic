@@ -13,8 +13,6 @@ class Problem:
 
         self.obstacles = []
 
-    ##### DS for constraints, parameters, and variables
-
     def set_constraint(self, name, exp, lbg=-DM_inf(), ubg=DM_inf()):
         self.constraints[name] = [exp, lbg, ubg]
 
@@ -43,7 +41,7 @@ class Problem:
         if obj != None:
             self.variables[name] = obj
         else:
-            self.variables[name] = SX.sym(name)
+            self.variables[name] = MX.sym(name)
 
     def get_variable(self, name):
         return self.variables[name]
