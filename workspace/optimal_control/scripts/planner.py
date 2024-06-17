@@ -7,11 +7,12 @@ from optimal_control.executor import Executor
 
 if __name__ == "__main__":
     init = State(0.0, 0.0, 0.0)
-    final = State(-2.0, -4.0, 0.0)
+    final = State(1.0, 0.2, 1.57)
 
     # X, Y, R -> Circular Obstacles
     obstacles = [
-        # [5.0, 5.0, 1.0, 1.0]
+        [5.0, 5.0, 1.0, 1.0],
+        [-5.0, 5.0, 1.0, 1.0]
     ]
 
     lm = LimoBot()
@@ -39,6 +40,8 @@ if __name__ == "__main__":
             note_th.append(float(constraints[th_idx]))
 
         fig, ax = plt.subplots()
+        ax.set_xlim(-10, 10)
+        ax.set_ylim(-10, 10)
 
         for obstacle in obstacles:
             ax.add_patch(patches.Circle(

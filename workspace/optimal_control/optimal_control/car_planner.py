@@ -126,7 +126,10 @@ class CarPlanner(Problem):
         # Distance between two states : Euclidean
         # TODO: Is this really how I should check path length?
         def length(stateA : State, stateB : State):
-            return power((stateA.x - stateB.x), 2) + power((stateA.y - stateB.y), 2)
+            dx = stateB.x - stateA.x
+            dy = stateB.y - stateA.y
+            dth = stateB.theta - stateA.theta
+            return power(dx, 2) + power(dy, 2) + 2.77*(dth)
 
         path_length = 0
         for i in range(1, self.number_of_states):
@@ -135,15 +138,27 @@ class CarPlanner(Problem):
         return path_length
 
     def initial_guess(self, *args, **kwargs):
-        r = sqrt(
-            power((self.final_state.x - self.initial_state.x), 2) \
-            + power((self.final_state.y - self.initial_state.y), 2)
-        )*0.5
+        dx = self.final_state.x - self.initial_state.x
+        dy = self.final_state.y - self.initial_state.y
 
-        k = 1/r
+        slope = dy/dx
+
+        guess_variables = []; first = True
+        r = sqrt(power(dx, 2) + power(dy, 2))*0.5
+
+        if abs(slope) < 1e-2:
+            # A straight line guess
+            k = 0
+            distance = r
+        else:
+            # An arc like initial guess
+            k = self.v/r
+            distance = r*pi
+
         x = self.initial_state.x; y = self.initial_state.y; theta = self.initial_state.theta
-        t = (r*pi)/self.v; dt = t/self.number_of_states
-        guess_variables = []
+        t = distance/self.v
+        dt = t/self.number_of_states
+
         for i in range(self.number_of_states):
             guess_variables.append(x)
             guess_variables.append(y)
@@ -153,9 +168,12 @@ class CarPlanner(Problem):
             guess_variables.append(self.v) # Unit Speed along the path
             guess_variables.append(k)
 
-            theta += self.v*k*dt
-            x += self.v*cos(theta)*dt
-            y += self.v*sin(theta)*dt
+            if not first:
+                x += sign(dx)*self.v*cos(theta)*dt
+                y += sign(dy)*self.v*sin(theta)*dt
+                theta += self.v*k*dt
+            else:
+                first = False
 
         return vertcat(*guess_variables)
 
@@ -170,7 +188,9 @@ class CarPlanner(Problem):
         opts = {
             "ipopt": {
                 "hessian_approximation": "limited-memory",
-                "max_iter": 1000
+                "max_iter": 10000,
+                # "max_cpu_time": 1.0,
+                "fast_step_computation": "yes"
             },
             "jit": True,
             "compiler": "shell"

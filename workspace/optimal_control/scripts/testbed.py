@@ -6,12 +6,12 @@ from optimal_control.car_planner import *
 from optimal_control.executor import Executor
 
 if __name__ == "__main__":
-    # map = [
-    #     [5.0, 5.0, 1.0, 1.0],
-    #     [-5.0, 5.0, 1.0, 1.0],
-    #     [5.0, -5.0, 1.0, 1.0],
-    #     [-5.0, -5.0, 1.0, 1.0]
-    # ]
+    map = [
+        # [5.0, 5.0, 1.0, 1.0],
+        # [-5.0, 5.0, 1.0, 1.0],
+        # [5.0, -5.0, 1.0, 1.0],
+        # [-5.0, -5.0, 1.0, 1.0]
+    ]
 
     lm = LimoBot()
     dc = CarPlanner(lm, granularity=10)
