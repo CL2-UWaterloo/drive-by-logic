@@ -7,12 +7,11 @@ from optimal_control.executor import Executor
 
 if __name__ == "__main__":
     init = State(0.0, 0.0, 0.0)
-    final = State(-7.0, 7.0, 0.0)
+    final = State(10.0, 10.0, 0.0)
 
     # X, Y, R -> Circular Obstacles
     obstacles = [
-        [5.0, 5.0, 1.0, 0.3],
-        [-5.0, 5.0, 1.0, 0.3]
+        [5.0, 5.0, 1.0, 1.0],
     ]
 
     lm = LimoBot()
@@ -28,6 +27,7 @@ if __name__ == "__main__":
     if "plot" in argv:
         import matplotlib.pyplot as plt
         import matplotlib.patches as patches
+        import matplotlib.lines as lines
 
         # Plot trajectory as imagined by the obstacle avoidance check
         intermediate_values = dc.get_constraint_idx_by_pattern("intermediate")
@@ -38,6 +38,16 @@ if __name__ == "__main__":
 
             th_idx = intermediate_values[i+2]
             note_th.append(float(constraints[th_idx]))
+
+        state_line = lines.Line2D([], [], linestyle=" ", marker="o", color="r")
+        for i in range(0, decision_variables.shape[0], 7):
+            line_x = state_line.get_xdata()
+            line_x.append(float(decision_variables[i]))
+            state_line.set_xdata(line_x)
+
+            line_y = state_line.get_ydata()
+            line_y.append(float(decision_variables[i+1]))
+            state_line.set_ydata(line_y)
 
         fig, ax = plt.subplots()
         ax.set_xlim(-10, 10)
@@ -62,35 +72,47 @@ if __name__ == "__main__":
                 head_width=0.1
             )
 
+        ax.add_line(state_line)
+
         plt.show()
 
     if "post" in argv:
         # Generating Control Sequences from States
         previous = None; commands = []
+        k = 0
         for i in range(0, decision_variables.shape[0], 7):
             # Get all the information
-            current = State.from_list(decision_variables[i:i+7])
+            current = Waypoint.from_list(decision_variables[i:i+7])
 
             # First Iteration
             if previous == None:
                 previous = current
+                k = previous.k
                 continue
 
-            time_elapsed = 0; dt = current.t*(1/dc.granularity)
-            k = previous.k
-            while time_elapsed < current.t:
+            dt = current.t*(1/dc.granularity)
+            for j in range(dc.granularity + 1):
                 k += current.s*dt
-                commands.append([current.v, k*current.v])
-                time_elapsed += dt
+                commands.append([float(dc.v), float(k*dc.v), float(dt)])
 
-        commands.append([0.0, 0.0])
+        commands.append([0.0, 0.0, 1.0])
 
         import rclpy
-        rclpy.init()
+        from rclpy.node import Node
+        from geometry_msgs.msg import Twist
 
-        ros_interface = TwistPublisher(dt, commands)
-        while ros_interface.index < len(commands):
-            rclpy.spin_once(ros_interface)
+        index = 0
+        msg = Twist()
+        rclpy.init()
+        ros_interface = Node("twist_publisher")
+        publisher = ros_interface.create_publisher(Twist, "/cmd_vel", 10)
+        while index < len(commands):
+            msg.linear.x = commands[index][0]
+            msg.angular.z = commands[index][1]
+            publisher.publish(msg)
+            dt = commands[index][2]
+            index += 1
+            sleep(dt)
 
         ros_interface.destroy_node()
         rclpy.shutdown()

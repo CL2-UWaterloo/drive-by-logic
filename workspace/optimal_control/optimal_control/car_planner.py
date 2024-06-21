@@ -26,7 +26,7 @@ class CarPlanner(Problem):
         self.max_steering_angle = self.robot.get_max_steering_angle()
 
         self.k = 1/self.minimum_turning_radius
-        self.v = self.max_linear_velocity*0.5
+        self.v = self.max_linear_velocity*0.4
 
     def prep_problem(self, *args, **kwargs):
         self.waypoints : list[Waypoint] = []
@@ -86,6 +86,7 @@ class CarPlanner(Problem):
             # Start with establishing the equality constraint between final and initial positions
             dx = Xim1.x; dy = Xim1.y; dth = Xim1.theta
             dk = Xim1.k; dt = Xi.t*(1/self.granularity)
+
             for j in range(self.granularity + 1):
                 jdx = str(j) + idx
 

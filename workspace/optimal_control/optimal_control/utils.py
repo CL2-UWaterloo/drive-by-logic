@@ -1,10 +1,9 @@
 #!/usr/bin/python3
 
 from dataclasses import dataclass
-from casadi import *
+from time import sleep
 
-from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from casadi import *
 
 from optimal_control.waypoint import Waypoint
 
@@ -69,19 +68,3 @@ def sinc(x : MX | SX | float):
             return 1
         else:
             return sin(x)/x
-
-class TwistPublisher(Node):
-
-    def __init__(self, dt, commands):
-        super().__init__("twist_publisher")
-        self.publisher = self.create_publisher(Twist, "/cmd_vel", 10)
-        self.commands = commands
-        self.timer = self.create_timer(dt, self.callback)
-        self.index = 0
-
-    def callback(self):
-        msg = Twist()
-        msg.linear.x = self.commands[self.index][0]
-        msg.angular.z = self.commands[self.index][1]
-        self.publisher.publish(msg)
-        self.index += 1

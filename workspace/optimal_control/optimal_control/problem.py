@@ -13,7 +13,7 @@ class Problem:
 
         self.obstacles = []
 
-    def set_constraint(self, name, exp, lbg=-DM_inf(), ubg=DM_inf()):
+    def set_constraint(self, name, exp, lbg=-DM.inf(), ubg=DM.inf()):
         self.constraints[name] = [exp, lbg, ubg]
 
     def set_equality_constraint(self, name, exp, value, abs_tol=1e-5):
