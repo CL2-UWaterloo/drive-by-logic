@@ -13,6 +13,7 @@ install(DIRECTORY scripts
 install(PROGRAMS
     scripts/planner.py
     scripts/testbed.py
+    scripts/analysis.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

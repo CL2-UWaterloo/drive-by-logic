@@ -14,7 +14,7 @@ if __name__ == "__main__":
     ]
 
     lm = LimoBot()
-    dc = CarPlanner(lm, granularity=10)
+    dc = CarPlanner(lm, number_of_waypoints=10, granularity=10, planner_type=PlannerType.ForwardSim)
 
     ex = Executor(dc)
     init = State(0.0, 0.0, 0.0)
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     x = []; y = []
     file_string = ""
 
-    text_file = open("output.txt", "w")
+    text_file = open("times_closed_10_10_min_jerk.txt", "w")
     for i in range(-10, 11, 1):
         for j in range(-10, 11, 1):
             if i == 0 and j == 0:

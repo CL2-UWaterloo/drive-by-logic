@@ -1,11 +1,7 @@
 #!/usr/bin/python3
 
 from dataclasses import dataclass
-from time import sleep
-
 from casadi import *
-
-from optimal_control.waypoint import Waypoint
 
 # Note: Not to be confused with optimization state, only used as syntax sugar
 @dataclass
@@ -36,17 +32,6 @@ class CarLikeRobot:
     def get_max_acceleration(self):
         return self.max_acceleration
 
-    def get_state_space(self, xnm1 : Waypoint, xn : Waypoint, dt : MX | float):
-        B = MX.zeros(xnm1.X.shape[0], xn.U.shape[0])
-
-        B[0, 0] = cos(xnm1.theta)*dt; B[0, 1] = 0.0
-        B[1, 0] = sin(xnm1.theta)*dt; B[1, 1] = 0.0
-        B[2, 0] = xnm1.k*dt; B[2, 1] = xn.v*(dt**2)
-        B[3, 0] = dt; B[3, 1] = 0.0
-
-        # MX.eye = Identity Matrix
-        return MX.eye(xnm1.X.shape[0]), B 
-
 # Limobot params https://github.com/agilexrobotics/limo-doc/blob/master/Limo%20user%20manual(EN).md#13-tech-specifications
 @dataclass
 class LimoBot(CarLikeRobot):
@@ -68,3 +53,8 @@ def sinc(x : MX | SX | float):
             return 1
         else:
             return sin(x)/x
+
+def parametric_arc(k, v, theta, dt):
+    phase = k*v*dt*0.5
+    arc = v*sinc(phase)*dt
+    return arc*cos(theta + phase), arc*sin(theta + phase), 2*phase

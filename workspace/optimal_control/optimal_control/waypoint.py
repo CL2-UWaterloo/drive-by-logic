@@ -5,8 +5,8 @@ from casadi import *
 
 @dataclass
 class Waypoint:
-    X : MX | DM  # State of the robot (4, 1) = (x, y, theta, k)
-    U : MX | DM # Control Inputs to the robot (v, s); s -> rate of change of curvature (2, 1)
+    X : MX | DM  # State of the robot (6, 1) = (x, y, theta, k, v, a)
+    U : MX | DM # Control Inputs to the robot (j, s); s -> rate of change of curvature (2, 1)
     t : MX | DM # Time taken for transitioning from the previous state to the current state
 
     @property
@@ -43,11 +43,11 @@ class Waypoint:
 
     @property
     def v(self):
-        return self.U[0]
+        return self.X[4]
 
     @v.setter
     def v(self, value : MX) -> None:
-        self.U[0] = value
+        self.X[4] = value
 
     @property
     def s(self):
@@ -57,7 +57,23 @@ class Waypoint:
     def s(self, value : MX) -> None:
         self.U[1] = value
 
+    @property
+    def a(self):
+        return self.X[5]
+
+    @a.setter
+    def a(self, value : MX) -> None:
+        self.X[5] = value
+
+    @property
+    def j(self):
+        return self.U[0]
+
+    @j.setter
+    def j(self, value : MX) -> None:
+        self.U[0] = value
+
     @staticmethod
     def from_list(value):
-        ret = Waypoint(X=DM(vertcat(value[0:4])), U=DM(vertcat(value[4:6])), t=DM(value[6]))
+        ret = Waypoint(X=DM(vertcat(value[0:6])), U=DM(vertcat(value[6:8])), t=DM(value[8]))
         return ret

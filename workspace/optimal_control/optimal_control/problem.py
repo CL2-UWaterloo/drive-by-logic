@@ -35,6 +35,7 @@ class Problem:
             if pattern in name:
                 ret.append(idx)
             idx += 1
+        ret.sort()
         return ret
 
     def set_variable(self, name, obj = None):
