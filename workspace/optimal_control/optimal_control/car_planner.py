@@ -18,7 +18,7 @@ class CarPlanner(Problem):
     def __init__(self, 
             robot : CarLikeRobot,
             planner_type : PlannerType,
-            number_of_waypoints = 6,
+            number_of_waypoints = 10,
             granularity = 10,
             t_max = 120
         ):
@@ -157,10 +157,7 @@ class CarPlanner(Problem):
             self.set_equality_constraint("a"+idx, Xi.a - da, 0)
 
     def objective(self, *args, **kwargs):
-        cost = 0
-        for i in range(self.number_of_waypoints):
-            cost += (self.waypoints[i].j*self.waypoints[i].k)**2
-        return cost
+        return 1
 
     def initial_guess(self, *args, **kwargs):
         dx = self.final_state.x - self.initial_state.x

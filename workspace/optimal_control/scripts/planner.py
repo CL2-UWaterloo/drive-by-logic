@@ -7,16 +7,16 @@ from optimal_control.car_planner import *
 from optimal_control.executor import Executor
 
 if __name__ == "__main__":
-    init = State(0.0, 0.0, 0.0)
-    final = State(-2.0, 0.0, 0.0)
+    init = State(1.0, 0.0, 0.0)
+    final = State(8.0, 8.0, 0.0)
 
     # X, Y, R -> Circular Obstacles
     obstacles = [
-        # [6.0, 6.0, 1.0, 1.0],
-        # [10.0, 10.0, 1.0, 1.0],
+        [6.0, 6.0, 1.0, 1.0],
+        [10.0, 10.0, 1.0, 1.0],
     ]
 
-    planner_type = PlannerType.ForwardSim
+    planner_type = PlannerType.ClosedForm
 
     lm = LimoBot()
     dc = CarPlanner(lm, number_of_waypoints=10, granularity=10, planner_type=planner_type)
