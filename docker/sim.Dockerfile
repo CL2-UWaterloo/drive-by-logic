@@ -3,11 +3,9 @@ FROM ros:humble
 
 RUN apt-get update && apt-get upgrade -y
 
-# http://wiki.ros.org/docker/Tutorials/Hardware%20Acceleration#nvidia-docker2
-ENV NVIDIA_VISIBLE_DEVICES \
-    ${NVIDIA_VISIBLE_DEVICES:-all}
-ENV NVIDIA_DRIVER_CAPABILITIES \
-    ${NVIDIA_DRIVER_CAPABILITIES:+$NVIDIA_DRIVER_CAPABILITIES,}graphics
+# https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=all
 
 RUN apt-get install --no-install-recommends -y \
     software-properties-common \
@@ -28,12 +26,12 @@ RUN apt-get install --no-install-recommends -y \
     ros-$ROS_DISTRO-rmw-cyclonedds-cpp
 
 # Use cyclone DDS by default
-ENV RMW_IMPLEMENTATION rmw_cyclonedds_cpp
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 # Source by default
 RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /root/.bashrc
 
-ENV WORKSPACE_PATH /root/workspace
+ENV WORKSPACE_PATH=/root/workspace
 
 COPY workspace/ $WORKSPACE_PATH/src/
 

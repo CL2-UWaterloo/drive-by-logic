@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+from enum import Enum
+
 from dataclasses import dataclass
 from casadi import *
 
@@ -38,7 +40,7 @@ class LimoBot(CarLikeRobot):
     minimum_turning_radius : float = 0.4 # m
     wheel_base : float = 0.2 # m
     max_linear_velocity : float = 1 # m/s
-    max_acceleration : float = 0.5 # m/s^2
+    max_acceleration : float = 0.2 # m/s^2
 
 def normalize_angle(x):
     x = fmod(x + pi, 2*pi)
@@ -58,3 +60,7 @@ def parametric_arc(k, v, theta, dt):
     phase = k*v*dt*0.5
     arc = v*sinc(phase)*dt
     return arc*cos(theta + phase), arc*sin(theta + phase), 2*phase
+
+class PlannerMode(Enum):
+    ClosedForm = 0
+    ForwardSim = 1

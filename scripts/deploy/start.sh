@@ -20,7 +20,7 @@ while getopts 'csh' opt; do
             sim="True"
             ;;
         ?|h)
-            echo "Usage: $(basename $0) [-g] [-s]"
+            echo "Usage: $(basename $0) [-c] [-s]"
             exit 1
             ;;
     esac
