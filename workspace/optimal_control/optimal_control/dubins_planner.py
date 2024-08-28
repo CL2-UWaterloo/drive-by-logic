@@ -12,20 +12,11 @@ class DubinsPlanner(Problem):
     
     def __init__(self,
             robot : CarLikeRobot,
-            planner_mode : PlannerMode,
-            number_of_waypoints = 10,
-            granularity = 10,
-            t_max = 120
+            planner_mode : PlannerMode
         ):
         super(DubinsPlanner, self).__init__()
         self.robot = robot
         self.prep_robot_information()
-
-        # Formulation Parameters
-        self.number_of_waypoints = number_of_waypoints
-        self.granularity = granularity
-        self.t_max = t_max # s
-
         self.planner_mode = planner_mode
 
         self.name = "Dubins Planner"
@@ -41,6 +32,10 @@ class DubinsPlanner(Problem):
         self.v = self.max_linear_velocity*0.4
 
     def prep_problem(self, *args, **kwargs):
+        self.number_of_waypoints = kwargs["number_of_waypoints"]
+        self.granularity = kwargs["granularity"]
+        self.t_max = kwargs["t_max"]
+
         self.waypoints : list[DubinWaypoint] = []
 
         for i in range(self.number_of_waypoints):
@@ -74,11 +69,6 @@ class DubinsPlanner(Problem):
         self.set_equality_constraint("th0", X0.theta, self.initial_state.theta)
         self.set_equality_constraint("t0", X0.t, 0.0)
 
-        # Final Boundary Conditions are subject to change based on problem description
-        self.set_equality_constraint("xn", Xn.x, self.final_state.x)
-        self.set_equality_constraint("yn", Xn.y, self.final_state.y)
-        self.set_equality_constraint("thn", Xn.theta, self.final_state.theta)
-
         # Iterate through all states to establish constraints
         for i in range(1, self.number_of_waypoints):
             idx = str(i)
@@ -98,8 +88,6 @@ class DubinsPlanner(Problem):
             dx = Xim1.x; dy = Xim1.y; dth = Xim1.theta
             dt = Xi.t/self.granularity
             for j in range(self.granularity):
-                jdx = str(j) + idx
-
                 if self.planner_mode == PlannerMode.ForwardSim:
                     dx += Xi.v*cos(dth)*dt
                     dy += Xi.v*sin(dth)*dt
@@ -111,23 +99,18 @@ class DubinsPlanner(Problem):
                     dy += py
                     dth += pth
 
-                # Check for obstacles
-                obs_id = 0
-                for obstacle in self.obstacles:
-                    odx = str(obs_id) + jdx
-                    # Distance from center of the circle
-                    check_obstacle = lambda x, y : \
-                        power(obstacle[0] - x, 2) + power(obstacle[1] - y, 2) - power(obstacle[2]+obstacle[3], 2)
-                    self.set_constraint("check_obs"+odx, check_obstacle(dx, dy), 0)
-                    obs_id += 1
+                self.signals.append(
+                    DubinWaypoint(
+                        vertcat(dx, dy, dth),
+                        vertcat(Xi.v, Xi.k),
+                        dt
+                    )
+                )
 
             # Continuity Constraints
             self.set_equality_constraint("x"+idx, Xi.x - dx, 0)
             self.set_equality_constraint("y"+idx, Xi.y - dy, 0)
             self.set_equality_constraint("theta"+idx, Xi.theta - dth, 0)
-
-    def objective(self, *args, **kwargs):
-        return 1
 
     def initial_guess(self, *args, **kwargs):
         dx = self.final_state.x - self.initial_state.x
@@ -186,8 +169,6 @@ class DubinsPlanner(Problem):
             "ipopt": {
                 "hessian_approximation": "limited-memory",
                 "max_iter": 1000,
-                # "max_cpu_time": 1.0,
-                "fast_step_computation": "yes",
                 "tol": 1e-2
             },
             "jit": True,

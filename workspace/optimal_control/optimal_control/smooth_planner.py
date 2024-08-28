@@ -13,19 +13,10 @@ class SmoothPlanner(Problem):
     def __init__(self, 
             robot : CarLikeRobot,
             planner_mode : PlannerMode,
-            number_of_waypoints = 10,
-            granularity = 10,
-            t_max = 120
         ):
         super(SmoothPlanner, self).__init__()
         self.robot = robot
         self.prep_robot_information()
-
-        # Formulation Parameters
-        self.number_of_waypoints = number_of_waypoints
-        self.granularity = granularity
-        self.t_max = t_max # s
-
         self.planner_mode = planner_mode
 
         self.name = "Smooth Planner"
@@ -41,6 +32,10 @@ class SmoothPlanner(Problem):
         self.v = self.max_linear_velocity*0.4
 
     def prep_problem(self, *args, **kwargs):
+        self.number_of_waypoints = kwargs["number_of_waypoints"]
+        self.granularity = kwargs["granularity"]
+        self.t_max = kwargs["t_max"]
+
         self.waypoints : list[SmoothWaypoint] = []
 
         for i in range(self.number_of_waypoints):
@@ -65,8 +60,8 @@ class SmoothPlanner(Problem):
         self.final_state : State = kwargs["final"]
         self.obstacles = kwargs["obstacles"]
 
-        # The first state is X0 and the last is Xn
-        X0 = self.waypoints[0]; Xn = self.waypoints[-1]
+        # The first state is X0
+        X0 = self.waypoints[0]
 
         # Boundary Conditionssmooth_planner
         self.set_equality_constraint("x0", X0.x, self.initial_state.x)
@@ -75,11 +70,6 @@ class SmoothPlanner(Problem):
         self.set_equality_constraint("t0", X0.t, 0.0)
         self.set_equality_constraint("v0", X0.v, 0.0)
         self.set_equality_constraint("a0", X0.a, 0.0)
-
-        # Final Boundary Conditions are subject to change based on problem description
-        self.set_equality_constraint("xn", Xn.x, self.final_state.x)
-        self.set_equality_constraint("yn", Xn.y, self.final_state.y)
-        self.set_equality_constraint("thn", Xn.theta, self.final_state.theta)
 
         # Iterate through all states to establish constraints
         for i in range(1, self.number_of_waypoints):
@@ -106,8 +96,6 @@ class SmoothPlanner(Problem):
             dv = Xim1.v; da = Xim1.a
             dt = Xi.t/self.granularity
             for j in range(self.granularity):
-                jdx = str(j) + idx
-
                 # Update step
                 da += Xi.j*dt
                 dv += da*dt
@@ -123,16 +111,14 @@ class SmoothPlanner(Problem):
                     dx += px
                     dy += py
                     dth += pth
-
-                # Check for obstacles
-                obs_id = 0
-                for obstacle in self.obstacles:
-                    odx = str(obs_id) + jdx
-                    # Distance from center of the circle
-                    check_obstacle = lambda x, y : \
-                        power(obstacle[0] - x, 2) + power(obstacle[1] - y, 2) - power(obstacle[2]+obstacle[3], 2)
-                    self.set_constraint("check_obs"+odx, check_obstacle(dx, dy), 0)
-                    obs_id += 1
+                
+                self.signals.append(
+                    SmoothWaypoint(
+                        vertcat(dx, dy, dth, dk, dv, da),
+                        vertcat(Xi.j, Xi.s),
+                        dt
+                    )
+                )
 
             # Continuity Constraints
             self.set_equality_constraint("x"+idx, Xi.x - dx, 0)
@@ -141,9 +127,6 @@ class SmoothPlanner(Problem):
             self.set_equality_constraint("k"+idx, Xi.k - dk, 0)
             self.set_equality_constraint("v"+idx, Xi.v - dv, 0)
             self.set_equality_constraint("a"+idx, Xi.a - da, 0)
-
-    def objective(self, *args, **kwargs):
-        return 1
 
     def initial_guess(self, *args, **kwargs):
         dx = self.final_state.x - self.initial_state.x

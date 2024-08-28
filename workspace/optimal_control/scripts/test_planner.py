@@ -1,19 +1,11 @@
 #!/usr/bin/python3
 
-from optimal_control.dubins_planner import *
-from optimal_control.smooth_planner import *
-from optimal_control.executor import Executor
+from optimal_control.stl_planner import *
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.lines as lines
 import matplotlib.axes as axes
-
-def plan(robot, init, final, obstacles, planner_type, planner_mode):
-    dc = planner_type(robot, planner_mode, number_of_waypoints=10, granularity=10)
-    ex = Executor(dc)
-    ex.prep(init=init, final=final, obstacles=obstacles)
-    return ex.solve(), dc
 
 def plot_plan(ax : axes.Axes, decision_variables : DM, planner_instance : DubinsPlanner | SmoothPlanner, solver):
     ax.set_title(planner_instance.name + ": " + planner_instance.planner_mode.name + ", time: "  + str(solver.stats()["t_proc_total"]) + ", Status: " + str(solver.stats()["success"]))
@@ -95,35 +87,37 @@ def plot_plan(ax : axes.Axes, decision_variables : DM, planner_instance : Dubins
 
 if __name__ == "__main__":
     init = State(0.0, 0.0, 0.0)
-    final = State(8.0, 2.0, 0.0)
+    final = State(10.0, 10.0, 0.0)
 
     # X, Y, R -> Circular Obstacles
     obstacles = [
-        [1.0, 1.0, 0.2, 0.2],
-        [10.0, 10.0, 1.0, 1.0],
+        # [1.0, 1.0, 0.2, 0.2],
+        # [10.0, 10.0, 1.0, 1.0],
     ]
 
     lm = LimoBot()
     fig, ax = plt.subplots(2, 2)
+    planner_factory = PlannerFactory(lm, DubinsPlanner, PlannerMode.ClosedForm)
+    stl_planner = STLPlanner(planner_factory)
 
-    (solution, solver), planner = plan(lm, init, final, obstacles, DubinsPlanner, PlannerMode.ClosedForm)
+    (solution, solver), planner = stl_planner.plan(init, final, obstacles)
     print(solver.stats()["success"], solver.stats()["t_proc_total"])
     decision_variables = solution["x"]; constraints = solution["g"]
     plot_plan(ax[0][0], decision_variables, planner, solver)
 
-    (solution, solver), planner = plan(lm, init, final, obstacles, SmoothPlanner, PlannerMode.ClosedForm)
-    print(solver.stats()["success"], solver.stats()["t_proc_total"])
-    decision_variables = solution["x"]; constraints = solution["g"]
-    plot_plan(ax[1][0], decision_variables, planner, solver)
+    # (solution, solver), planner = plan(lm, init, final, obstacles, SmoothPlanner, PlannerMode.ClosedForm)
+    # print(solver.stats()["success"], solver.stats()["t_proc_total"])
+    # decision_variables = solution["x"]; constraints = solution["g"]
+    # plot_plan(ax[1][0], decision_variables, planner, solver)
 
-    (solution, solver), planner = plan(lm, init, final, obstacles, DubinsPlanner, PlannerMode.ForwardSim)
-    print(solver.stats()["success"], solver.stats()["t_proc_total"])
-    decision_variables = solution["x"]; constraints = solution["g"]
-    plot_plan(ax[0][1], decision_variables, planner, solver)
+    # (solution, solver), planner = plan(lm, init, final, obstacles, DubinsPlanner, PlannerMode.ForwardSim)
+    # print(solver.stats()["success"], solver.stats()["t_proc_total"])
+    # decision_variables = solution["x"]; constraints = solution["g"]
+    # plot_plan(ax[0][1], decision_variables, planner, solver)
 
-    (solution, solver), planner = plan(lm, init, final, obstacles, SmoothPlanner, PlannerMode.ClosedForm)
-    print(solver.stats()["success"], solver.stats()["t_proc_total"])
-    decision_variables = solution["x"]; constraints = solution["g"]
-    plot_plan(ax[1][1], decision_variables, planner, solver)
+    # (solution, solver), planner = plan(lm, init, final, obstacles, SmoothPlanner, PlannerMode.ClosedForm)
+    # print(solver.stats()["success"], solver.stats()["t_proc_total"])
+    # decision_variables = solution["x"]; constraints = solution["g"]
+    # plot_plan(ax[1][1], decision_variables, planner, solver)
 
     plt.show()

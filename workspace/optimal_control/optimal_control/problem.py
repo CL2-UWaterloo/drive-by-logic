@@ -13,6 +13,11 @@ class Problem:
 
         self.obstacles = []
 
+        self.cost = 1
+
+        # Signal Storage, All types stored are to be homogenous
+        self.signals = []
+
     def set_constraint(self, name, exp, lbg=-DM.inf(), ubg=DM.inf()):
         self.constraints[name] = [exp, lbg, ubg]
 
@@ -59,15 +64,15 @@ class Problem:
     def get_defined_parameters(self, name):
         return self.defined_parameters[name]
 
+    def objective(self, *args, **kwargs):
+        return self.cost
+
     ##### Abstract Functions
 
     def prep_problem(self, *args, **kwargs):
         pass
 
     def prep_constraints(self, *args, **kwargs):
-        pass
-
-    def objective(self, *args, **kwargs):
         pass
 
     def initial_guess(self, *args, **kwargs):
