@@ -69,6 +69,7 @@ class DubinsPlanner(Problem):
         self.set_equality_constraint("th0", X0.theta, self.initial_state.theta)
         self.set_equality_constraint("t0", X0.t, 0.0)
 
+        time_elapsed = 0
         # Iterate through all states to establish constraints
         for i in range(1, self.number_of_waypoints):
             idx = str(i)
@@ -83,7 +84,7 @@ class DubinsPlanner(Problem):
             self.set_constraint("k"+idx, Xi.k, -self.k, self.k)
 
             # Time constraint
-            self.set_constraint("t"+idx, Xi.t, 0.0, self.t_max/self.number_of_waypoints)
+            self.set_equality_constraint("t"+idx, Xi.t, self.t_max/self.number_of_waypoints)
 
             dx = Xim1.x; dy = Xim1.y; dth = Xim1.theta
             dt = Xi.t/self.granularity
@@ -103,9 +104,10 @@ class DubinsPlanner(Problem):
                     DubinWaypoint(
                         vertcat(dx, dy, dth),
                         vertcat(Xi.v, Xi.k),
-                        dt
+                        time_elapsed
                     )
                 )
+                time_elapsed += dt
 
             # Continuity Constraints
             self.set_equality_constraint("x"+idx, Xi.x - dx, 0)
@@ -114,7 +116,7 @@ class DubinsPlanner(Problem):
 
     def initial_guess(self, *args, **kwargs):
         dx = self.final_state.x - self.initial_state.x
-        dy = self.final_state.y - self.initial_state.y
+        dy = self.final_state.x - self.initial_state.y
 
         if dx != 0:
             slope = dy/dx
@@ -144,8 +146,8 @@ class DubinsPlanner(Problem):
                 guess_variables.append(pi + theta)
             else:
                 guess_variables.append(theta)
-            guess_variables.append(k)
             guess_variables.append(self.v) # Unit Speed along the path
+            guess_variables.append(k)
             guess_variables.append(dt) # Equal time for all states
 
             if not first:
@@ -154,7 +156,7 @@ class DubinsPlanner(Problem):
                 theta += self.v*k*dt
             else:
                 first = False
-
+        
         return vertcat(*guess_variables)
 
     def solve(self, *args, **kwargs):
@@ -167,20 +169,21 @@ class DubinsPlanner(Problem):
 
         opts = {
             "ipopt": {
-                "hessian_approximation": "limited-memory",
-                "max_iter": 1000,
-                "tol": 1e-2
+                # "fast_step_computation": "yes"
+                # "hessian_approximation": "limited-memory",
+                # "max_iter": 500,
+                # "tol": 1e-8
             },
-            "jit": True,
-            "compiler": "shell",
-            "expand": True,
+            # "jit": True,
+            # "compiler": "shell",
+            "expand": True
         }
 
         sol = nlpsol("Solver", "ipopt", nlp, opts)
 
         if "warm_start" not in kwargs.keys():
             return sol(
-                x0 = self.initial_guess(),
+                # x0 = self.initial_guess(),
                 lbg = vertcat(*constraints[1]),
                 ubg = vertcat(*constraints[2])
             ), sol

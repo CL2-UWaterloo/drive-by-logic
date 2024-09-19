@@ -71,6 +71,7 @@ class SmoothPlanner(Problem):
         self.set_equality_constraint("v0", X0.v, 0.0)
         self.set_equality_constraint("a0", X0.a, 0.0)
 
+        time_elapsed = 0
         # Iterate through all states to establish constraints
         for i in range(1, self.number_of_waypoints):
             idx = str(i)
@@ -88,7 +89,7 @@ class SmoothPlanner(Problem):
             self.set_constraint("a"+idx, Xi.a, -self.max_acceleration, self.max_acceleration)
 
             # Time constraint
-            self.set_constraint("t"+idx, Xi.t, 0.0, self.t_max/self.number_of_waypoints)
+            self.set_equality_constraint("t"+idx, Xi.t, self.t_max/self.number_of_waypoints)
 
             # Start with establishing the equality constraint between final and initial positions
             dx = Xim1.x; dy = Xim1.y
@@ -116,9 +117,10 @@ class SmoothPlanner(Problem):
                     SmoothWaypoint(
                         vertcat(dx, dy, dth, dk, dv, da),
                         vertcat(Xi.j, Xi.s),
-                        dt
+                        time_elapsed
                     )
                 )
+                time_elapsed += dt
 
             # Continuity Constraints
             self.set_equality_constraint("x"+idx, Xi.x - dx, 0)
@@ -185,16 +187,15 @@ class SmoothPlanner(Problem):
         }
 
         opts = {
-            "ipopt": {
+           "ipopt": {
+                # "fast_step_computation": "yes"
                 "hessian_approximation": "limited-memory",
-                "max_iter": 1000,
-                # "max_cpu_time": 1.0,
-                "fast_step_computation": "yes",
-                "tol": 1e-2
+                # "max_iter": 500,
+                # "tol": 1e-8
             },
-            "jit": True,
-            "compiler": "shell",
-            "expand": True,
+            # "jit": True,
+            # "compiler": "shell",
+            "expand": True
         }
 
         sol = nlpsol("Solver", "ipopt", nlp, opts)

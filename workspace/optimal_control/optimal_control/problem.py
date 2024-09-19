@@ -14,6 +14,7 @@ class Problem:
         self.obstacles = []
 
         self.cost = 1
+        self.guess_variables = []
 
         # Signal Storage, All types stored are to be homogenous
         self.signals = []
