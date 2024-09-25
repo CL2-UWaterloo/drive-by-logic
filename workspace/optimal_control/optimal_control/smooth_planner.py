@@ -57,7 +57,7 @@ class SmoothPlanner(Problem):
     def prep_constraints(self, *args, **kwargs):
         # Get Initial, Final waypoints, and Obstacles from arguments.
         self.initial_state : State = kwargs["init"]
-        self.final_state : State = kwargs["final"]
+        # self.final_state : State = kwargs["final"]
         self.obstacles = kwargs["obstacles"]
 
         # The first state is X0
@@ -89,7 +89,10 @@ class SmoothPlanner(Problem):
             self.set_constraint("a"+idx, Xi.a, -self.max_acceleration, self.max_acceleration)
 
             # Time constraint
-            self.set_equality_constraint("t"+idx, Xi.t, self.t_max/self.number_of_waypoints)
+            self.set_constraint("t"+idx, Xi.t, 0)
+
+            # Max Jerk
+            self.set_constraint("j"+idx, Xi.j, 0, self.max_acceleration/0.2)
 
             # Start with establishing the equality constraint between final and initial positions
             dx = Xim1.x; dy = Xim1.y
@@ -130,9 +133,11 @@ class SmoothPlanner(Problem):
             self.set_equality_constraint("v"+idx, Xi.v - dv, 0)
             self.set_equality_constraint("a"+idx, Xi.a - da, 0)
 
+        self.set_constraint("time_elapsed", time_elapsed, lbg=self.t_max)
+
     def initial_guess(self, *args, **kwargs):
-        dx = self.final_state.x - self.initial_state.x
-        dy = self.final_state.y - self.initial_state.y
+        dx = 10 - self.initial_state.x
+        dy = 10 - self.initial_state.y
 
         if dx != 0:
             slope = dy/dx
@@ -187,11 +192,10 @@ class SmoothPlanner(Problem):
         }
 
         opts = {
-           "ipopt": {
-                # "fast_step_computation": "yes"
+            "ipopt": {
                 "hessian_approximation": "limited-memory",
-                # "max_iter": 500,
-                # "tol": 1e-8
+                "max_iter": 500,
+                "tol": 1e-2
             },
             # "jit": True,
             # "compiler": "shell",

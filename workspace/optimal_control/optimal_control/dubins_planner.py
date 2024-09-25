@@ -57,7 +57,7 @@ class DubinsPlanner(Problem):
     def prep_constraints(self, *args, **kwargs):
         # Get Initial, Final waypoints, and Obstacles from arguments.
         self.initial_state : State = kwargs["init"]
-        self.final_state : State = kwargs["final"]
+        # self.final_state : State = kwargs["final"]
         self.obstacles = kwargs["obstacles"]
 
         # The first state is X0 and the last is Xn
@@ -69,7 +69,7 @@ class DubinsPlanner(Problem):
         self.set_equality_constraint("th0", X0.theta, self.initial_state.theta)
         self.set_equality_constraint("t0", X0.t, 0.0)
 
-        time_elapsed = 0
+        self.time_elapsed = 0
         # Iterate through all states to establish constraints
         for i in range(1, self.number_of_waypoints):
             idx = str(i)
@@ -84,10 +84,12 @@ class DubinsPlanner(Problem):
             self.set_constraint("k"+idx, Xi.k, -self.k, self.k)
 
             # Time constraint
-            self.set_equality_constraint("t"+idx, Xi.t, self.t_max/self.number_of_waypoints)
+            self.set_constraint("t"+idx, Xi.t, 0)
 
             dx = Xim1.x; dy = Xim1.y; dth = Xim1.theta
             dt = Xi.t/self.granularity
+            # self.set_constraint("dt"+idx, dt, lbg=1/self.granularity)
+
             for j in range(self.granularity):
                 if self.planner_mode == PlannerMode.ForwardSim:
                     dx += Xi.v*cos(dth)*dt
@@ -104,19 +106,21 @@ class DubinsPlanner(Problem):
                     DubinWaypoint(
                         vertcat(dx, dy, dth),
                         vertcat(Xi.v, Xi.k),
-                        time_elapsed
+                        self.time_elapsed
                     )
                 )
-                time_elapsed += dt
+                self.time_elapsed += dt
 
             # Continuity Constraints
             self.set_equality_constraint("x"+idx, Xi.x - dx, 0)
             self.set_equality_constraint("y"+idx, Xi.y - dy, 0)
             self.set_equality_constraint("theta"+idx, Xi.theta - dth, 0)
+        
+        self.set_constraint("time_elapsed", self.time_elapsed, lbg=self.t_max)
 
     def initial_guess(self, *args, **kwargs):
-        dx = self.final_state.x - self.initial_state.x
-        dy = self.final_state.x - self.initial_state.y
+        dx = 10 - self.initial_state.x
+        dy = 10 - self.initial_state.y
 
         if dx != 0:
             slope = dy/dx
@@ -169,10 +173,9 @@ class DubinsPlanner(Problem):
 
         opts = {
             "ipopt": {
-                # "fast_step_computation": "yes"
-                # "hessian_approximation": "limited-memory",
-                # "max_iter": 500,
-                # "tol": 1e-8
+                "hessian_approximation": "limited-memory",
+                "max_iter": 500,
+                "tol": 1e-2
             },
             # "jit": True,
             # "compiler": "shell",
@@ -183,7 +186,7 @@ class DubinsPlanner(Problem):
 
         if "warm_start" not in kwargs.keys():
             return sol(
-                # x0 = self.initial_guess(),
+                x0 = self.initial_guess(),
                 lbg = vertcat(*constraints[1]),
                 ubg = vertcat(*constraints[2])
             ), sol
