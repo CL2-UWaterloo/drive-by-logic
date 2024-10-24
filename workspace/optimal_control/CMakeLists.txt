@@ -11,8 +11,10 @@ install(DIRECTORY scripts
 )
 
 install(PROGRAMS
-    scripts/test_planner.py
+    scripts/distributed_reach_avoid.py
+    scripts/multi_reach_avoid.py
     scripts/reach_avoid.py
+    scripts/visit_all.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

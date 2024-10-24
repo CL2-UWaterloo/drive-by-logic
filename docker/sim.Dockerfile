@@ -40,3 +40,6 @@ RUN rosdep update && cd $WORKSPACE_PATH && \
 
 COPY scripts/setup/ /root/scripts/setup
 RUN /root/scripts/setup/workspace.sh
+
+# For Plotting
+RUN pip3 install imageio[ffmpeg]

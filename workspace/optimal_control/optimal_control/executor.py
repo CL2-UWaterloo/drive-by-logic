@@ -10,13 +10,10 @@ class Executor:
     def prep(self, *args, **kwargs):
         self.problem.prep_problem(*args, **kwargs)
         self.problem.prep_constraints(*args, **kwargs)
-
+    
     def solve(self, *args, **kwargs):
-        solution, solver = self.problem.solve()
         if "warming_iterations" in kwargs.keys():
-            warm_start = solution["x"]
-            for _ in range(kwargs["warming_iterations"] - 1):
-                solution, solver = self.problem.solve(warm_start = warm_start)
-                warm_start = solution["x"]
-            solution, solver = self.problem.solve(warm_start = warm_start)
-        return solution, solver
+            result = self.problem.solve(iterations=kwargs["warming_iterations"])
+            return self.problem.solve(iterations=500, warm_start=result)
+        else:
+            return self.problem.solve(iterations=500)

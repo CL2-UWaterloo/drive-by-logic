@@ -20,20 +20,21 @@ class Problem:
         self.signals = []
 
     def set_constraint(self, name, exp, lbg=-DM.inf(), ubg=DM.inf()):
-        self.constraints[name] = [exp, lbg, ubg]
+        self.constraints[name] = [exp, lbg, ubg, False]
 
     def set_equality_constraint(self, name, exp, value, abs_tol=1e-5):
-        self.constraints[name] = [exp, value - abs_tol, value + abs_tol]
+        self.constraints[name] = [exp, value, value, True]
     
     def get_constraints(self):
-        g = []; lbg = []; ubg = []
+        g = []; lbg = []; ubg = []; equality = []
         for name in self.constraints.keys():
             constraint = self.constraints[name]
             g.append(constraint[0])
             lbg.append(constraint[1])
             ubg.append(constraint[2])
+            equality.append(constraint[3])
 
-        return g, lbg, ubg
+        return g, lbg, ubg, equality
 
     def get_constraint_idx_by_pattern(self, pattern):
         idx = 0; ret = []
