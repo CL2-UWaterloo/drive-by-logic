@@ -153,10 +153,11 @@ class DistributedDubinsPlanner(Problem):
 
         gradients = []; sym_waypoints = []; grad_outputs = []
         for agent in range(self.number_of_agents):
+            sym_gradient = gradient(self.cost, get_sym_waypoint(agent))
             function = Function(
                 "grad_robust_eval"+str(agent),
                 [vertcat(*self.get_variables())],
-                [gradient(self.cost, get_sym_waypoint(agent))]
+                [sym_gradient]
             )
             gradients.append(function.buffer())
 
@@ -170,7 +171,7 @@ class DistributedDubinsPlanner(Problem):
         max_iters = kwargs["iterations"]; iters = 0; alpha = 1e-2
         robustness = [float(eval_robustness(get_waypoints()))]; selected_agent = 0
         best_robustness = robustness[-1]; best_solution = deepcopy(agents)
-        buffer = 0
+        buffer = 0; gradient_buffer = 0; robustness_buffer = 0
         while iters < max_iters:
             if selected_agent == 0:
                 selected_agent = 1
@@ -183,7 +184,9 @@ class DistributedDubinsPlanner(Problem):
             print("Selected Agent: ", selected_agent)
 
             # If the change in robustness is not large enough, quit.
+            robustness_buffer_start = time()
             eval_robustness_buffer[1]()
+            robustness_buffer += time() - robustness_buffer_start
             robustness.append(robustness_output[0][0])
             iters += 1
             print("Iteration", iters)
@@ -200,7 +203,9 @@ class DistributedDubinsPlanner(Problem):
             sym_waypoint = sym_waypoints[selected_agent]
             waypoint = get_waypoint(selected_agent, agents)
 
+            gradient_buffer_start = time()
             gradients[selected_agent][1]()
+            gradient_buffer += time() - gradient_buffer_start
             solver = qpsol("Solver", "qpoases",
                 {
                     "x" : sym_waypoint,
@@ -227,4 +232,5 @@ class DistributedDubinsPlanner(Problem):
             buffer += (time() - buffer_start)
             set_waypoint(selected_agent, waypoint + (power(0.99, 4.5*iters) + 0.001)*(solution["x"]-waypoint))
 
+        print(robustness_buffer, gradient_buffer)
         return best_solution, buffer, best_robustness, robustness
