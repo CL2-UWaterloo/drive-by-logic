@@ -3,6 +3,7 @@
 from dataclasses import asdict
 from copy import deepcopy
 from time import time
+from itertools import cycle
 
 from casadi import *
 
@@ -139,6 +140,11 @@ class DistributedDubinsPlanner(Problem):
             agent_vars = self.waypoints[i*self.number_of_waypoints:(i+1)*self.number_of_waypoints]
             return vertcat(*[waypoint.matrix_form() for waypoint in agent_vars])
 
+        def cycles(iterable, n = 2):
+            it = cycle(iterable)
+            while True:
+                yield [next(it) for _ in range(n)]
+
         # To evaluate robustness
         eval_robustness = Function(
             "robustness_eval",
@@ -168,69 +174,71 @@ class DistributedDubinsPlanner(Problem):
 
             sym_waypoints.append(get_sym_waypoint(agent))
 
-        max_iters = kwargs["iterations"]; iters = 0; alpha = 1e-2
-        robustness = [float(eval_robustness(get_waypoints()))]; selected_agent = 0
+        robustness = [float(eval_robustness(get_waypoints()))]
         best_robustness = robustness[-1]; best_solution = deepcopy(agents)
-        buffer = 0; gradient_buffer = 0; robustness_buffer = 0
+        buffer = 0; opts = cycles([k for k in range(self.number_of_agents)], n=1)
+
+        min_robustness = 3.5
+
+        max_iters = kwargs["iterations"]; iters = 0; alpha = 1e-3
         while iters < max_iters:
-            if selected_agent == 0:
-                selected_agent = 1
-            else:
-                selected_agent = 0
+            selected_agents = next(opts); updates = []
+            for selected_agent in selected_agents:
+                # Get current states of the agents
+                waypoints = get_waypoints(); robustness_input = np.array(waypoints)
+                print("Previous Robustness: ", robustness[-1])
+                print("Selected Agent: ", selected_agent)
 
-            # Get current states of the agents
-            waypoints = get_waypoints(); robustness_input = np.array(waypoints)
-            print("Previous Robustness: ", robustness[-1])
-            print("Selected Agent: ", selected_agent)
+                # If the change in robustness is not large enough, quit.
+                eval_robustness_buffer[1]()
+                robustness.append(robustness_output[0][0])
+                iters += 1
+                print("Iteration", iters)
+                print("Current Robustness: ", robustness[-1])
 
-            # If the change in robustness is not large enough, quit.
-            robustness_buffer_start = time()
-            eval_robustness_buffer[1]()
-            robustness_buffer += time() - robustness_buffer_start
-            robustness.append(robustness_output[0][0])
-            iters += 1
-            print("Iteration", iters)
-            print("Current Robustness: ", robustness[-1])
+                if robustness[-1] > best_robustness:
+                    best_robustness = robustness[-1]
+                    best_solution = deepcopy(agents)
 
-            if robustness[-1] > best_robustness:
-                best_robustness = robustness[-1]
-                best_solution = deepcopy(agents)
+                if robustness[iters] > min_robustness:
+                    break
 
-            if robustness[iters] > 3.5:
+                init = self.initial_states[selected_agent]
+                sym_waypoint = sym_waypoints[selected_agent]
+                waypoint = get_waypoint(selected_agent, agents)
+
+                gradients[selected_agent][1]()
+                solver = qpsol("Solver", "qpoases",
+                    {
+                        "x" : sym_waypoint,
+                        "f" : -dot(grad_outputs[selected_agent], (sym_waypoint-waypoint)) + \
+                            alpha*0.5*power(norm_2(sym_waypoint - waypoint), 2),
+                        "g" : self.time_elapsed[selected_agent],
+                    }, {
+                        "printLevel" : "none"
+                    }
+                )
+                buffer_start = time()
+                solution = solver(
+                    lbg = self.t_max,
+                    ubg = self.t_max,
+                    lbx = vertcat(
+                        [init.x, init.y, init.theta, 0, 0, 0],
+                        *([-10, -10, -pi, 0, -self.k, 0]*(self.number_of_waypoints-1))
+                    ),
+                    ubx = vertcat(
+                        [init.x, init.y, init.theta, 0, 0, 0],
+                        *([-10, -10, -pi, self.v, self.k, self.t_max]*(self.number_of_waypoints-1))
+                    ),
+                )
+                buffer += (time() - buffer_start)
+                updates.append((selected_agent, solution["x"]))
+
+            for update in updates:
+                waypoint = get_waypoint(update[0], agents)
+                set_waypoint(update[0], waypoint + (power(0.99, 5*iters) + 0.001)*(solution["x"]-waypoint))
+            
+            if robustness[iters] > min_robustness:
                 break
 
-            init = self.initial_states[selected_agent]
-            sym_waypoint = sym_waypoints[selected_agent]
-            waypoint = get_waypoint(selected_agent, agents)
-
-            gradient_buffer_start = time()
-            gradients[selected_agent][1]()
-            gradient_buffer += time() - gradient_buffer_start
-            solver = qpsol("Solver", "qpoases",
-                {
-                    "x" : sym_waypoint,
-                    "f" : -dot(grad_outputs[selected_agent], (sym_waypoint-waypoint)) + \
-                        alpha*0.5*power(norm_2(sym_waypoint - waypoint), 2),
-                    "g" : self.time_elapsed[selected_agent],
-                }, {
-                    "printLevel" : "none"
-                }
-            )
-            buffer_start = time()
-            solution = solver(
-                lbg = self.t_max,
-                ubg = self.t_max,
-                lbx = vertcat(
-                    [init.x, init.y, init.theta, 0, 0, 0],
-                    *([-10, -10, -pi, 0, -self.k, 0]*(self.number_of_waypoints-1))
-                ),
-                ubx = vertcat(
-                    [init.x, init.y, init.theta, 0, 0, 0],
-                    *([-10, -10, -pi, self.v, self.k, self.t_max]*(self.number_of_waypoints-1))
-                ),
-            )
-            buffer += (time() - buffer_start)
-            set_waypoint(selected_agent, waypoint + (power(0.99, 4.5*iters) + 0.001)*(solution["x"]-waypoint))
-
-        print(robustness_buffer, gradient_buffer)
         return best_solution, buffer, best_robustness, robustness

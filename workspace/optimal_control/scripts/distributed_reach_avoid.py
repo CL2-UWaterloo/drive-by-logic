@@ -15,66 +15,51 @@ def multi_reach_avoid(planner, final, t_max):
             ]
         )
 
-    # Agent 1
-    reach1_signals = []
-    not_reach1_signals = []
-    for signal in agent_signals[0]:
-        dx = power(signal.x - final[0][0], 2)
-        dy = power(signal.y - final[0][1], 2)
-        reach1_signals.append(
-            (-(dx + dy - 4), signal)
-        )
-        not_reach1_signals.append(
-            ((dx + dy - 4), signal)
-        )
-    part1 = eventually(*reach1_signals, lb=0, ub=t_max)
+    reach_signals = []
+    not_reach_signals = []
+    for k in range(planner.number_of_agents):
+        reach_k_signals = []
+        not_reach_k_signals = []
+        for signal in agent_signals[k]:
+            dx = power(signal.x - final[0][0], 2)
+            dy = power(signal.y - final[0][1], 2)
+            reach_k_signals.append(
+                (-(dx + dy - 4), signal)
+            )
+            not_reach_k_signals.append(
+                ((dx + dy - 4), signal)
+            )
+        reach_signals.append(reach_k_signals)
+        not_reach_signals.append(not_reach_k_signals)
 
-    reach2_signals = []
-    not_reach2_signals = []
-    for signal in agent_signals[1]:
-        dx = power(signal.x - final[0][0], 2)
-        dy = power(signal.y - final[0][1], 2)
-        reach2_signals.append(
-            (-(dx + dy - 4), signal)
-        )
-        not_reach2_signals.append(
-            ((dx + dy - 4), signal)
-        )
-
-    part2 = eventually(*reach2_signals, lb=0, ub=t_max)
-
-    part3 = until(first=not_reach1_signals, second=reach2_signals, lb=t_max/4, ub=t_max/2)
+    part1 = eventually(*reach_signals[0], lb=0, ub=t_max)
+    part3 = until(first=not_reach_signals[0], second=reach_signals[1], lb=0, ub=t_max/2)
 
     pvp_signals = []
-    for idx in range(len(agent_signals[0])):
-        dx = power(agent_signals[0][idx].x - agent_signals[1][idx].x, 2)
-        dy = power(agent_signals[0][idx].y - agent_signals[1][idx].y, 2)
-        pvp_signals.append(
-            ((dx + dy - 2), signal)
-        )
+    for k1 in range(planner.number_of_agents):
+        for idx in range(len(agent_signals[k1])):
+            for k2 in range(planner.number_of_agents):
+                if k1 == k2:
+                    continue
+                dx = power(agent_signals[k1][idx].x - agent_signals[k2][idx].x, 2)
+                dy = power(agent_signals[k1][idx].y - agent_signals[k2][idx].y, 2)
+                pvp_signals.append(
+                    ((dx + dy - 2), signal)
+                )
     part4 = always(*pvp_signals, lb=0, ub=t_max)
 
     part5 = []
     for obstacle in planner.obstacles:
-        for signal in agent_signals[0]:
-            dx = power(signal.x - obstacle[0], 2)
-            dy = power(signal.y - obstacle[1], 2)
-            part5.append(
-                always(
-                    (dx + dy - power(obstacle[2], 2), signal), 
-                    lb=0, ub=t_max
+        for k in range(planner.number_of_agents):
+            for signal in agent_signals[k]:
+                dx = power(signal.x - obstacle[0], 2)
+                dy = power(signal.y - obstacle[1], 2)
+                part5.append(
+                    always(
+                        (dx + dy - power(obstacle[2], 2), signal), 
+                        lb=0, ub=t_max
+                    )
                 )
-            )
-
-        for signal in agent_signals[1]:
-            dx = power(signal.x - obstacle[0], 2)
-            dy = power(signal.y - obstacle[1], 2)
-            part5.append(
-                always(
-                    (dx + dy - power(obstacle[2], 2), signal), 
-                    lb=0, ub=t_max
-                )
-            )
 
     planner.cost = mmin(
         vertcat(
@@ -99,7 +84,7 @@ if __name__ == "__main__":
 
     lm = LimoBot()
     pf = PlannerFactory(lm, DistributedDubinsPlanner, PlannerMode.ClosedForm)
-    solution, total_time, score, robustness = plan(multi_reach_avoid, init, final, obstacles, pf, 85, 4, 50, 2)
+    solution, total_time, score, robustness = plan(multi_reach_avoid, init, final, obstacles, pf, 100, 4, 50, 2)
     print(score, total_time)
 
     waypoint_logs = []

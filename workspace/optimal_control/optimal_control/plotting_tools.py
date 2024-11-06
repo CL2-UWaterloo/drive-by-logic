@@ -35,7 +35,7 @@ class ProcessPlotter:
         self.legend_elements = []
 
         self.state_lines = []
-        colors = ["#0072BD", "#D95319"]
+        colors = ["#F28522", "#009ADE", "#FFAA00"]
         for agent in range(self.number_of_agents):
             self.state_lines.append(
                 lines.Line2D(
