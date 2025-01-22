@@ -11,10 +11,13 @@ install(DIRECTORY scripts
 )
 
 install(PROGRAMS
-    scripts/distributed_reach_avoid.py
-    scripts/multi_reach_avoid.py
-    scripts/reach_avoid.py
-    scripts/visit_all.py
+    scripts/reach_avoid_single_stl.py
+    scripts/visit_all_single_stl.py
+    scripts/narrow_passage_single_stl.py
+    scripts/reach_avoid_multi_stl.py
+    scripts/view_environments.py
+    scripts/run_experiment.py
+    scripts/initial_guess_gen.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -5,72 +5,74 @@ from casadi import *
 class Problem:
 
     def __init__(self):
+        # Optimization Variables
         self.variables = {}
-        self.parameters = {}
-        self.defined_parameters = {}
 
-        self.constraints = {} # name : [g, lbg, ubg]
+        # Parameters for equality constraints (initial states and such)
+        self.parameter_symbols = {}
+        self.parameter_values = {}
 
-        self.obstacles = []
+        # name : [g, lbg, ubg]
+        self.constraints = {}
 
+        # Objective function
         self.cost = 1
-        self.guess_variables = []
 
-        # Signal Storage, All types stored are to be homogenous
+        # Signal Storage
+        # Stores symbolic states of the trajectory
         self.signals = []
 
     def set_constraint(self, name, exp, lbg=-DM.inf(), ubg=DM.inf()):
-        self.constraints[name] = [exp, lbg, ubg, False]
+        self.constraints[name] = [exp, lbg, ubg]
 
-    def set_equality_constraint(self, name, exp, value, abs_tol=1e-5):
-        self.constraints[name] = [exp, value, value, True]
-    
+    def set_equality_constraint(self, name, exp, value):
+        self.constraints[name] = [exp, value, value]
+
     def get_constraints(self):
-        g = []; lbg = []; ubg = []; equality = []
+        g = []; lbg = []; ubg = []
+
         for name in self.constraints.keys():
             constraint = self.constraints[name]
             g.append(constraint[0])
             lbg.append(constraint[1])
             ubg.append(constraint[2])
-            equality.append(constraint[3])
 
-        return g, lbg, ubg, equality
-
-    def get_constraint_idx_by_pattern(self, pattern):
-        idx = 0; ret = []
-        for name in self.constraints.keys():
-            if pattern in name:
-                ret.append(idx)
-            idx += 1
-        ret.sort()
-        return ret
+        return g, lbg, ubg
 
     def set_variable(self, name, obj = None):
         if obj != None:
             self.variables[name] = obj
         else:
-            self.variables[name] = MX.sym(name)
+            self.variables[name] = SX.sym(name)
 
     def get_variable(self, name):
         return self.variables[name]
 
     def get_variables(self):
-        variables = []
-        for name in self.variables.keys():
-            variables.append(self.variables[name])
-        return variables
+        return list(self.variables.values())
 
-    def set_defined_parameters(self, name, value):
-        self.defined_parameters[name] = value
+    def set_parameter(self, name, symbol, value):
+        self.parameter_symbols[name] = symbol
+        self.parameter_values[name] = value
 
-    def get_defined_parameters(self, name):
-        return self.defined_parameters[name]
+    def get_parameter_symbol(self, name):
+        return self.parameter_symbols[name]
+
+    def get_parameter_value(self, name):
+        return self.parameter_values[name]
+
+    def get_parameters_symbols(self):
+        return list(self.parameter_symbols.values())
+
+    def get_parameters_values(self):
+        return list(self.parameter_values.values())
 
     def objective(self, *args, **kwargs):
         return self.cost
 
     ##### Abstract Functions
 
+    # TODO: Use ABC for this
     def prep_problem(self, *args, **kwargs):
         pass
 

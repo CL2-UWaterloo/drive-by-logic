@@ -4,3 +4,6 @@ archive/
 *.webm
 *.txt
 literature/
+*.bag
+.mp4
+workspace/coinhsl/*

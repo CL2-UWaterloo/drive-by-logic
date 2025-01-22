@@ -1,22 +1,23 @@
 #!/usr/bin/python3
 
 from casadi import *
+from optimal_control.utils import *
 
 def eventually(*expressions, **options):
     lb = options["lb"]; ub = options["ub"]
     with_interval = []
     for expression in expressions:
         window = logic_and(ge(expression[-1].t, lb), ge(ub, expression[-1].t))
-        with_interval.append(if_else(window, expression[0], -1e+16))
-    return mmax(vertcat(*with_interval))
+        with_interval.append(if_else(window, expression[0], -INF))
+    return logsumexp(vertcat(*with_interval), MARGIN)
 
 def always(*expressions, **options):
     lb = options["lb"]; ub = options["ub"]
     with_interval = []
     for expression in expressions:
         window = logic_and(ge(expression[-1].t, lb), ge(ub, expression[-1].t))
-        with_interval.append(if_else(window, expression[0], 1e+16))
-    return mmin(vertcat(*with_interval))
+        with_interval.append(if_else(window, expression[0], INF))
+    return -logsumexp(-vertcat(*with_interval))
 
 def eventuallyAlways(*expressions, **options):
     lbo = options["lbo"]; ubo = options["ubo"]
@@ -24,14 +25,14 @@ def eventuallyAlways(*expressions, **options):
     with_interval = []
     for expression in expressions:
         window = logic_and(ge(expression[-1].t, lbo), ge(ubo, expression[-1].t))
-        lt = expression[-1].t + lbi; ut = expression[-1].t + ubi
+        lt = expression[-1].t + lbi; ut = lt + ubi
         with_interval.append(
             if_else(
                 window,
                 always(*expressions, lb=lt, ub=ut),
-            -1e+16)
+            -INF)
         )
-    return mmax(vertcat(*with_interval))
+    return logsumexp(vertcat(*with_interval), MARGIN)
 
 def alwaysEventually(*expressions, **options):
     lbo = options["lbo"]; ubo = options["ubo"]
@@ -39,14 +40,14 @@ def alwaysEventually(*expressions, **options):
     with_interval = []
     for expression in expressions:
         window = logic_and(ge(expression[-1].t, lbo), ge(ubo, expression[-1].t))
-        lt = expression[-1].t + lbi; ut = expression[-1].t + ubi
+        lt = expression[-1].t + lbi; ut = lt + ubi
         with_interval.append(
             if_else(
                 window,
                 eventually(*expressions, lb=lt, ub=ut),
-            1e+16)
+            INF)
         )
-    return mmin(vertcat(*with_interval))
+    return -logsumexp(-vertcat(*with_interval))
 
 def until(**options):
     lb = options["lb"]; ub = options["ub"]
@@ -61,13 +62,13 @@ def until(**options):
             with_interval_.append(
                 if_else(
                     window_,
-                    expression_[0], 1e+16
-                )
+                    expression_[0],
+                INF)
             )
         with_interval.append(
             if_else(
                 window,
-                fmin(expression[0], mmin(vertcat(*with_interval_))),
-            -1e+16)
+                fmin(expression[0], -logsumexp(-vertcat(*with_interval_))),
+            -INF)
         )
-    return mmax(vertcat(*with_interval))
+    return logsumexp(vertcat(*with_interval), MARGIN)

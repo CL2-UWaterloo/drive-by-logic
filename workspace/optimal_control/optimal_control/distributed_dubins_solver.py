@@ -32,7 +32,7 @@ class DistributedDubinsPlanner(Problem):
         self.max_steering_angle = self.robot.get_max_steering_angle()
 
         self.k = 1/self.minimum_turning_radius
-        self.v = self.max_linear_velocity*0.4
+        self.v = self.max_linear_velocity
 
     def prep_problem(self, *args, **kwargs):
         self.number_of_agents = kwargs["number_of_agents"]
@@ -46,24 +46,23 @@ class DistributedDubinsPlanner(Problem):
             jdx = str(j)
             for i in range(self.number_of_waypoints):
                 idx = jdx + str(i)
-                # Make Waypoint
-                waypoint = Waypoint(
-                    MX.sym("X"+idx, 3, 1),
-                    MX.sym("U"+idx, 2, 1),
-                    MX.sym("t"+idx, 1, 1)
-                )
 
-                for _, value in asdict(waypoint).items():
-                    self.set_variable(value.name(), value)
+                waypoint = Waypoint.construct(idx)
+
+                self.set_variable("X"+idx, waypoint.X)
+                self.set_variable("U"+idx, waypoint.U)
+                self.set_variable("t"+idx, waypoint.t)
+
+                # for _, value in asdict(waypoint).items():
+                #     self.set_variable(value.name(), value)
 
                 self.waypoints.append(waypoint)
 
     def prep_constraints(self, *args, **kwargs):
         # Get Initial, Obstacles from arguments
         self.initial_states : list[State] = kwargs["init"]
-        self.obstacles = kwargs["obstacles"]
 
-        self.time_elapsed = []
+        self.time_elapsed = []; self.velocities = []
         for k in range(self.number_of_agents):
             kdx = str(k)
             # First waypoint of kth robot
@@ -71,47 +70,45 @@ class DistributedDubinsPlanner(Problem):
 
             self.signals.append(X0)
 
-            self.time_elapsed.append(0)
-            dx = X0.x; dy = X0.y; dth = X0.theta
+            self.time_elapsed.append(0); self.velocities.append([])
+            dx = X0.x; dy = X0.y; dth = X0.theta; dv = X0.v
             for i in range(k*self.number_of_waypoints + 1, (k+1)*self.number_of_waypoints):
                 idx = kdx + str(i)
 
                 # Current state and previous state (Xim1 = Xi-1)
-                Xi = self.waypoints[i]; Xim1 = self.waypoints[i-1]
+                Xi = self.waypoints[i]
 
                 # dx = Xim1.x; dy = Xim1.y; dth = Xim1.theta
                 dt = Xi.t/self.granularity
 
                 for j in range(self.granularity):
+                    dv += Xi.a*dt
+                    
                     if self.planner_mode == PlannerMode.ForwardSim:
-                        dx += Xi.v*cos(dth)*dt
-                        dy += Xi.v*sin(dth)*dt
-                        dth += Xi.k*Xi.v*dt
+                        dx += dv*cos(dth)*dt
+                        dy += dv*sin(dth)*dt
+                        dth += Xi.k*dv*dt
                     
                     elif self.planner_mode == PlannerMode.ClosedForm:
-                        px, py, pth = parametric_arc(Xi.k, Xi.v, dth, dt)
-                        dx += px
-                        dy += py
-                        dth += pth
+                        px, py, pth = parametric_arc(Xi.k, dv, dth, dt)
+                        dx += px; dy += py; dth += pth
 
-                    self.time_elapsed[k] += dt
                     self.signals.append(
-                        Waypoint(
-                            vertcat(dx, dy, dth),
-                            vertcat(Xi.v, Xi.k),
-                            self.time_elapsed[k]
+                        Waypoint.from_list(
+                            [dx, dy, dth, dv, Xi.a, Xi.k, self.time_elapsed[k]]
                         )
                     )
+                    self.velocities[k].append(dv)
+                    self.time_elapsed[k] += dt
 
     def solve(self, *args, **kwargs):
         # Init Agents and states
         agents = []
         for state in self.initial_states:
             agents.append(
-                [Waypoint(
-                    X=vertcat(state.x, state.y, state.theta),
-                    U=vertcat(0.0, 0.0),
-                    t=0.0
+                [Waypoint.from_list(
+                    [state.x, state.y, state.theta, 0.0, 0.0, 0.0, 0.0],
+                    _castype=DM
                 )]*self.number_of_waypoints
             )
 
@@ -131,9 +128,9 @@ class DistributedDubinsPlanner(Problem):
         def set_waypoint(i, vector):
             for idx in range(self.number_of_waypoints):
                 agents[i][idx] = Waypoint(
-                    vector[idx*6 : idx*6 + 3],
-                    vector[idx*6 + 3: idx*6 + 5],
-                    vector[idx*6 + 5 : idx*6 + 6]
+                    vector[idx*7 : idx*7 + 4],
+                    vector[idx*7 + 4: idx*7 + 6],
+                    vector[idx*7 + 6 : idx*7 + 7]
                 )
 
         def get_sym_waypoint(i):
@@ -180,7 +177,7 @@ class DistributedDubinsPlanner(Problem):
 
         min_robustness = 3.5
 
-        max_iters = kwargs["iterations"]; iters = 0; alpha = 1e-3
+        max_iters = kwargs["iterations"]; iters = 0; alpha = 5e-3
         while iters < max_iters:
             selected_agents = next(opts); updates = []
             for selected_agent in selected_agents:
@@ -213,22 +210,22 @@ class DistributedDubinsPlanner(Problem):
                         "x" : sym_waypoint,
                         "f" : -dot(grad_outputs[selected_agent], (sym_waypoint-waypoint)) + \
                             alpha*0.5*power(norm_2(sym_waypoint - waypoint), 2),
-                        "g" : self.time_elapsed[selected_agent],
+                        "g" : vertcat(self.time_elapsed[selected_agent], *self.velocities[selected_agent]),
                     }, {
                         "printLevel" : "none"
                     }
                 )
                 buffer_start = time()
                 solution = solver(
-                    lbg = self.t_max,
-                    ubg = self.t_max,
+                    lbg = vertcat(self.t_max, *[0]*len(self.velocities[selected_agent])),
+                    ubg = vertcat(self.t_max, *[self.v]*len(self.velocities[selected_agent])),
                     lbx = vertcat(
-                        [init.x, init.y, init.theta, 0, 0, 0],
-                        *([-10, -10, -pi, 0, -self.k, 0]*(self.number_of_waypoints-1))
+                        [init.x, init.y, init.theta, 0, 0, 0, 0],
+                        *([-10, -10, -pi, 0, -self.max_acceleration, -self.k, 0]*(self.number_of_waypoints-1))
                     ),
                     ubx = vertcat(
-                        [init.x, init.y, init.theta, 0, 0, 0],
-                        *([-10, -10, -pi, self.v, self.k, self.t_max]*(self.number_of_waypoints-1))
+                        [init.x, init.y, init.theta, 0, 0, 0, 0],
+                        *([-10, -10, -pi, self.v, self.max_acceleration, self.k, self.t_max]*(self.number_of_waypoints-1))
                     ),
                 )
                 buffer += (time() - buffer_start)
@@ -236,7 +233,7 @@ class DistributedDubinsPlanner(Problem):
 
             for update in updates:
                 waypoint = get_waypoint(update[0], agents)
-                set_waypoint(update[0], waypoint + (power(0.99, 5*iters) + 0.001)*(solution["x"]-waypoint))
+                set_waypoint(update[0], waypoint + (power(0.99, iters) + 0.001)*(solution["x"]-waypoint))
             
             if robustness[iters] > min_robustness:
                 break
