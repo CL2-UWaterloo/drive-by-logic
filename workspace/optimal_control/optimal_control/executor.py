@@ -12,7 +12,7 @@ class Executor:
         self.problem.prep_constraints(*args, **kwargs)
     
     def solve(self, *args, **kwargs):
-        iterations = 5000
+        iterations = 10000
         if "max_iters" in kwargs.keys():
             iterations = kwargs["max_iters"]
 

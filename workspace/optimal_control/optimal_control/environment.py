@@ -16,8 +16,9 @@ class Region:
     def outside_region(self, state : State) -> float | MX | DM:
         pass
 
-    def set_patch_color(self, color : str ="red"):
+    def set_patch_color(self, color : str ="red", paint_edge=True):
         self.patch.set_edgecolor(color)
+        self.patch.set_facecolor((color, 0.2))
 
     def plot(self) -> patches.Patch:
         return deepcopy(self.patch)
@@ -30,7 +31,7 @@ class Circle(Region):
         self.patch = patches.Circle(
             self.center,
             self.radius,
-            linewidth=1, edgecolor=color, facecolor='none'
+            linewidth=1, edgecolor=color, facecolor="none"
         )
 
     def inside_region(self, state : State) -> float | MX | DM:
@@ -69,7 +70,7 @@ class Rectangle(Region):
             self.anchor,
             self.width,
             self.height,
-            linewidth=1, edgecolor=color, facecolor='none'
+            linewidth=1, edgecolor=color, facecolor="none"
         )
 
     def inside_region(self, state) -> float | MX | DM:
@@ -96,18 +97,18 @@ class Environment:
         self.obstacles  : list[Region] = None
 
         self.po = PlotOptions(
-            (-2.0, 25.0), (-2.0, 25.0), "Placeholder"
+            (-2.0, 25.0), (-2.0, 25.0), "TODO: Plot Title"
         )
 
-    def set_final(self, final : Region | list[Region] = None):
+    def set_final(self, final : Region | list[Region] = None, color="green"):
         self.final = final
         if type(self.final) == list:
             self.multi_goal = True
             for fin in self.final:
-                fin.set_patch_color("blue")
+                fin.set_patch_color(color)
         else:
             self.multi_goal = False
-            self.final.set_patch_color("blue")
+            self.final.set_patch_color(color)
 
     def set_obstacles(self, obstacles):
         self.obstacles = obstacles
@@ -142,13 +143,33 @@ class Environment:
 def simple_environment_1() -> Environment:
     environ = Environment()
     environ.set_final(
-        Rectangle(2.0, 2.0, (10.0, 10.0))
+        Rectangle(4.0, 4.0, (10.0, 10.0))
     )
     environ.set_obstacles(
         [
             Rectangle(2.0, 2.0, (5.0, 5.0))
         ]
     )
+    environ.po.xlim = (-10, 30)
+    environ.po.ylim = (-10, 20)
+    environ.po.title="Reach and Avoid"
+    return environ
+
+def real_environment_1() -> Environment:
+    environ = Environment()
+    environ.set_final(
+        Rectangle(1.0, 1.0, (3.0, 3.0))
+    )
+    environ.set_obstacles(
+        [
+            Rectangle(0.5, 0.5, (1.0, 1.0)),
+            Rectangle(0.5, 0.5, (2.0, 1.0)),
+            Rectangle(0.5, 0.5, (1.0, 2.0))
+        ]
+    )
+    environ.po.xlim = (-2, 5)
+    environ.po.ylim = (-2, 5)
+    environ.po.title="Reach and Avoid"
     return environ
 
 def simple_environment_2() -> Environment:
@@ -220,7 +241,76 @@ def narrow_environment() -> Environment:
             Rectangle(10.0, 1.0, (4.0, -2.0))
         ]
     )
-    environ.po.xlim = (-2, 15)
-    environ.po.ylim = (-2, 12)
+    environ.po.xlim = (-1, 12)
+    environ.po.ylim = (-1, 12)
     environ.po.title = "Narrow Passage"
+    return environ
+
+def bottleneck() -> Environment:
+    environ = Environment()
+    environ.set_final(
+        [
+            Rectangle(2.0, 2.0, (13.0, 10.0)),
+            Rectangle(2.0, 2.0, (13.0, 0.0)),
+            Rectangle(1.0, 1.0, (13.0, 0.0))
+        ]
+    )
+    environ.set_obstacles(
+        [
+            Rectangle(3.0, 40.0, (0.0, 13.0)),
+            Rectangle(3.0, 40.0, (0.0, -3.0)),
+            Rectangle(5.5, 2.0, (6.0, 1.25)),
+            Rectangle(5.5, 2.0, (6.0, 8.75))
+        ]
+    )
+
+    environ.final[1].set_patch_color("orange")
+
+    environ.po.xlim = (-10, 14)
+    environ.po.ylim = (-4, 14)
+    environ.po.title = "Simple Puzzle"
+    return environ
+
+def farmland() -> Environment:
+    environ = Environment()
+
+    finals = []
+    i_step = 2; j_step = 2
+    for i in range(0, 12, i_step):
+        for j in range(0, 12, j_step):
+            finals.append(
+                Rectangle(1.0, 1.0, (i, j))
+            )
+    environ.set_final(finals)
+
+    obstacles = []
+    for i in range(1, 10, i_step):
+        obstacles.append(
+            Rectangle(12.0, 1.0, (i, 5.0))
+        )
+    environ.set_obstacles(obstacles)
+
+    environ.po.xlim = (-4, 15)
+    environ.po.ylim = (-4, 15)
+    return environ
+
+def highway() -> Environment:
+    environ = Environment()
+
+    environ.set_final(
+        [
+            Rectangle(1.0, 10.0, (15.0, -0.5))
+        ]
+    )
+
+    environ.set_obstacles(
+        [
+            Rectangle(18, 40.0, (0.0, 10.0)),
+            Rectangle(18, 40.0, (0.0, -10.0))
+        ]
+    )
+
+    environ.po.xlim = (-2, 15)
+    environ.po.ylim = (-1, 1)
+    environ.po.title = "Highway"
     return environ

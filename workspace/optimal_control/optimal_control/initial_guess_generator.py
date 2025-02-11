@@ -34,7 +34,7 @@ def generate_guess(
     parameters.append(X0.matrix_form())
     parameter_values.append(vertcat(
         initial_state.x, initial_state.y, initial_state.theta,
-        initial_state.v, 0.0, 0.0, 0.0
+        initial_state.v, 0.0, 0.0
     ))
     waypoints.append(X0)
 
@@ -42,7 +42,8 @@ def generate_guess(
     max_curvature = 1/robot.get_minimum_turning_radius()
     max_velocity = robot.get_max_linear_velocity()
 
-    signals : list[Waypoint] = []; time_sum = 0
+    signals : list[Waypoint] = []
+    M = 40; dt = total_time/((number_of_waypoints-1)*M)
     for i in range(1, number_of_waypoints):
         idx = str(i)
         Xi = Waypoint.construct(idx); Xim1 = waypoints[i-1]
@@ -66,7 +67,6 @@ def generate_guess(
 
         # Making Constraints: Manipulate M here to ensure numeric feasibility
         dx = Xim1.x; dy = Xim1.y; dth = Xim1.theta; dv = Xim1.v
-        M = 20; dt = Xi.t/M
         for j in range(M):
             dv += Xi.a*dt
 
@@ -75,7 +75,7 @@ def generate_guess(
 
             signals.append(
                 Waypoint.from_list(
-                    [dx, dy, dth, dv, Xi.a, Xi.k, (j+1)*dt]
+                    [dx, dy, dth, dv, Xi.a, Xi.k]
                 )
             )
         
@@ -85,12 +85,6 @@ def generate_guess(
         constraints.append(diff)
         constraints_lbg.append(GenDM_zeros(4,1))
         constraints_ubg.append(constraints_lbg[-1])
-
-        time_sum += Xi.t
-
-    constraints.append(time_sum)
-    constraints_lbg.append(total_time)
-    constraints_ubg.append(total_time)
 
     for state in states:
         predicates = []

@@ -50,7 +50,6 @@ class DubinsPlanner(Problem):
                 if i != 0:
                     self.set_variable("X"+idx, waypoint.X)
                     self.set_variable("U"+idx, waypoint.U)
-                    self.set_variable("t"+idx, waypoint.t)
 
                 self.waypoints.append(waypoint)
 
@@ -76,7 +75,6 @@ class DubinsPlanner(Problem):
             self.set_parameter("y"+kdx+"0", X0.y, self.initial_states[k].y)
             self.set_parameter("th"+kdx+"0", X0.theta, self.initial_states[k].theta)  
             self.set_parameter("v"+kdx+"0", X0.v, 0.0)
-            self.set_parameter("t"+kdx+"0", X0.t, 0.0)
             self.set_parameter("a"+kdx+"0", X0.a, 0.0)
             self.set_parameter("k"+kdx+"0", X0.k, 0.0)
 
@@ -93,11 +91,8 @@ class DubinsPlanner(Problem):
                 # Curvature Constraint
                 self.set_constraint("k"+idx, Xi.k, -self.k, self.k)
 
-                # Time Constraint
-                self.set_constraint("t"+idx, Xi.t, 0.0)
-
                 dx = Xim1.x; dy = Xim1.y; dth = Xim1.theta; dv = Xim1.v
-                dt = Xi.t/self.granularity
+                dt = (self.hrz/(self.number_of_waypoints-1))/self.granularity
                 for j in range(self.granularity):
                     jdx = idx + str(j)
 
@@ -117,19 +112,15 @@ class DubinsPlanner(Problem):
                         px, py, pth = parametric_arc(Xi.k, dv, dth, dt)
                         dx += px; dy += py; dth += pth
 
-                    self.time_elapsed[k] += dt
-
                     self.signals.append(
                         Waypoint.from_list(
-                            [dx, dy, dth, dv, Xi.a, Xi.k, self.time_elapsed[k]]
+                            [dx, dy, dth, dv, Xi.a, Xi.k]
                         )
                     )
 
                 # Continuity Constraints
                 diff = Xi.X - vertcat(dx, dy, dth, dv)
                 self.set_equality_constraint("Xeq"+idx, diff, GenDM_zeros(4, 1))
-            
-            self.set_equality_constraint("time_elapsed"+kdx, self.time_elapsed[k], self.hrz)
 
     def solve(self, *args, **kwargs):
         constraints = self.get_constraints()
@@ -146,21 +137,24 @@ class DubinsPlanner(Problem):
                 "hessian_approximation": "limited-memory",
                 "max_iter": kwargs["iterations"],
                 
-                # "tol": 1e-2,
+                "tol": 1e-2,
                 
                 # "print_timing_statistics": "yes",
                 "linear_solver": "ma27",
 
                 # "tiny_step_tol": float(MARGIN),
 
-                # "warm_start_init_point": "yes",
-                # "warm_start_bound_push": 1e-9,
-                # "warm_start_bound_frac": 1e-9,
-                # "warm_start_slack_bound_frac": 1e-9,
-                # "warm_start_slack_bound_push": 1e-9,
-                # "warm_start_mult_bound_push": 1e-9,
+                "bound_relax_factor": 1e-2,
+
+                "warm_start_init_point": "yes",
+                "warm_start_bound_push": 1e-9,
+                "warm_start_bound_frac": 1e-9,
+                "warm_start_slack_bound_frac": 1e-2,
+                "warm_start_slack_bound_push": 1e-2,
+                "warm_start_mult_bound_push": 1e-9,
 
                 # "mu_init": 1e-9,
+                # "print_level": 0
             },
             "print_time": True,
             "expand": True
@@ -170,7 +164,7 @@ class DubinsPlanner(Problem):
 
         if "warm_start" in kwargs.keys():
             solution = sol(
-                # x0 = kwargs["warm_start"]["x"],
+                x0 = kwargs["warm_start"]["x"],
                 lbg = vertcat(*constraints[1]),
                 ubg = vertcat(*constraints[2]),
                 p = vertcat(*self.get_parameters_values())

@@ -4,15 +4,29 @@ from optimal_control.environment import *
 import matplotlib.pyplot as plt
 import matplotlib.lines as lines
 
+import matplotlib
+
 class Plotter:
 
-    def __init__(self, po : PlotOptions, trajectories : list[list[State]] = None, environment : list[Region] = None):
+    def __init__(self, 
+        po : PlotOptions,
+        trajectories : list[list[State]] = None,
+        environment : list[Region] = None,
+        waypoints : list[list[State]] = None
+    ):
         self.trajectories = trajectories
+        self.waypoints = waypoints
 
         # Common jargon
-        self.figure, self.axis = plt.subplots(1, 1)
+        matplotlib.rcParams["figure.dpi"] = 300
 
-        self.axis.set_prop_cycle(color=['red', 'green', 'blue'])
+        matplotlib.rcParams["font.family"] = "serif"
+        matplotlib.rcParams["font.size"] = 8
+        # matplotlib.rcParams["font.serif"] = "Times New Roman"
+        self.figure, self.axis = plt.subplots(1, 1)
+        self.axis.axis("equal")
+
+        self.colors =  ["royalblue", "seagreen", "red", "black",  "brown", "purple"]
 
         if trajectories != None:
             self.paths = [
@@ -20,11 +34,29 @@ class Plotter:
                 self.axis.add_line(
                     lines.Line2D(
                         [], [],
-                        linestyle=" ",
-                        marker="o",
-                        markersize=2.0
+                        linestyle="-",
+                        color=self.colors[_],
+                        linewidth=0.7
                     )
                 ) for _ in range(len(self.trajectories))
+            ]
+            # self.start_points = [
+            #     self.axis.plot(
+            #         self.trajectories[_][0].x, self.trajectories[_][0].y, marker="o", markersize=4.0, color=self.colors[_]
+            #     ) for _ in range(len(self.trajectories))
+            # ]
+
+        if self.waypoints != None:
+            self.sparse_paths = [
+                self.axis.add_line(
+                    lines.Line2D(
+                        [], [],
+                        linestyle=" ",
+                        marker="o",
+                        markersize=2.0,
+                        color = self.colors[_]
+                    )
+                ) for _ in range(len(self.waypoints))
             ]
 
         if environment != None:
@@ -33,18 +65,18 @@ class Plotter:
 
         self.axis.set_xlim(po.xlim); self.axis.set_ylim(po.ylim)
         self.axis.set_xlabel("X"); self.axis.set_ylabel("Y")
-        self.axis.set_title(po.title)
+        # self.axis.set_title(po.title)
 
     def show_animation(self, record = False):
         if record:
             import io
             import imageio
             self.frames = []
-        self.timer = self.figure.canvas.new_timer(interval=1)
-        self.path_idx = 0
+        self.timer = self.figure.canvas.new_timer(interval=100)
+        self.path_idx = 0; self.done = 0
 
         def callback():
-            termination = (self.trajectories == None) or (self.path_idx == len(self.trajectories[0]))
+            termination = (self.trajectories == None) or (self.done == len(self.trajectories) - 1)
             
             if termination:
                 self.figure.canvas.draw()
@@ -63,10 +95,13 @@ class Plotter:
 
             for k in range(len(self.trajectories)):
                 x, y = self.paths[k].get_data()
-                x.append(self.trajectories[k][self.path_idx].x)
-                y.append(self.trajectories[k][self.path_idx].y)
-                self.paths[k].set_data(x, y)
-        
+                try:
+                    x.append(self.trajectories[k][self.path_idx].x)
+                    y.append(self.trajectories[k][self.path_idx].y)
+                    self.paths[k].set_data(x, y)
+                except:
+                    self.done += 1
+
             self.figure.canvas.draw()
             self.path_idx += 1
 
@@ -77,9 +112,9 @@ class Plotter:
         plt.show()
 
         if record:
-            imageio.mimsave("example.mp4", self.frames)
+            imageio.mimsave("example.mp4", self.frames[1:])
 
-    def show_plot(self):
+    def show_plot(self, plot=True):
         # Get the number of points in the trajectory
         if self.trajectories != None:
             for k in range(len(self.trajectories)):
@@ -87,4 +122,13 @@ class Plotter:
                 for state in self.trajectories[k]:
                     x.append(state.x); y.append(state.y)
                 self.paths[k].set_data(x, y)
-        plt.show()
+
+        if self.waypoints != None:
+            for k in range(len(self.waypoints)):
+                x = []; y = []
+                for state in self.waypoints[k]:
+                    x.append(state.x); y.append(state.y)
+                self.sparse_paths[k].set_data(x, y)
+        
+        if plot:
+            plt.show()

@@ -7,9 +7,11 @@ import statistics
 regex = "[,]?[+-]?\d+\.?\d*"
 
 if __name__ == "__main__":
-    experiment_name = "narrow_passage_single_stl"
+    experiment_name = "overtake"
 
-    total = 100
+    # Last column to indicate the number of cases of success or failure
+
+    total = 10
     opt_success = 0; opt_times = []; opt_robust = []
     start_points = []
     for i in range(total):
@@ -30,6 +32,7 @@ if __name__ == "__main__":
                 perturb_y = float(re.findall(regex, line)[0])
 
         if (perturb_x, perturb_y) in start_points:
+            opt_success += 1
             continue
         else:
             start_points.append((perturb_x, perturb_y))

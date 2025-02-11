@@ -8,11 +8,10 @@ from casadi import *
 class Waypoint:
     state_size : ClassVar[int] = 4
     input_size : ClassVar[int] = 2
-    total_size : ClassVar[int] = state_size + input_size + 1
+    total_size : ClassVar[int] = state_size + input_size
 
     X : MX | SX | DM # State of the robot (4, 1) = (x, y, theta, v)
     U : MX | SX | DM # Control Inputs to the robot (a, k)
-    t : MX | SX | DM # Time taken for transitioning from the previous state to the current state
 
     @property
     def x(self):
@@ -63,28 +62,25 @@ class Waypoint:
         self.U[1] = value
 
     def matrix_form(self):
-        return vertcat(self.X, self.U, self.t)
+        return vertcat(self.X, self.U)
 
     @staticmethod
     def from_list(value, _castype=SX):
         return Waypoint(
             X=_castype(vertcat(*value[0 : Waypoint.state_size])),
-            U=_castype(vertcat(*value[Waypoint.state_size : Waypoint.state_size + Waypoint.input_size])),
-            t=_castype(value[Waypoint.state_size + Waypoint.input_size])
+            U=_castype(vertcat(*value[Waypoint.state_size : Waypoint.state_size + Waypoint.input_size]))
         )
 
     @staticmethod
     def from_vector(vector):
         return Waypoint(
             X = vector[0 : Waypoint.state_size],
-            U = vector[Waypoint.state_size : Waypoint.input_size + Waypoint.state_size],
-            t = vector[Waypoint.input_size + Waypoint.state_size]
+            U = vector[Waypoint.state_size : Waypoint.input_size + Waypoint.state_size]
         )
 
     @staticmethod
     def construct(suffix=""):
         return Waypoint(
             X=SX.sym("X"+suffix, Waypoint.state_size, 1),
-            U=SX.sym("U"+suffix, Waypoint.input_size, 1),
-            t=SX.sym("t"+suffix, 1, 1)
+            U=SX.sym("U"+suffix, Waypoint.input_size, 1)
         )
