@@ -6,7 +6,7 @@ find_package(ament_cmake REQUIRED)
 # https://docs.ros.org/en/humble/How-To-Guides/Ament-CMake-Python-Documentation.html
 find_package(ament_cmake_python REQUIRED)
 
-install(DIRECTORY scripts
+install(DIRECTORY scripts config launch
     DESTINATION share/${PROJECT_NAME}/
 )
 

@@ -1,0 +1,110 @@
+import os
+
+from ament_index_python.packages import get_package_share_directory
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
+
+# from nav2_common.launch import Node
+from launch_ros.actions import Node
+from nav2_common.launch import RewrittenYaml
+
+def generate_launch_description():
+    namespace = LaunchConfiguration('namespace')
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    autostart = LaunchConfiguration('autostart')
+    params_file = LaunchConfiguration('params_file')
+    use_lifecycle_mgr = LaunchConfiguration('use_lifecycle_mgr')
+
+    map_yaml_file = LaunchConfiguration(
+        'map',
+        default=os.path.join(
+            get_package_share_directory('optimal_control'),
+            'config',
+            'map_clean.yaml'))
+
+    remappings = [((namespace, '/tf'), '/tf'),
+                  ((namespace, '/tf_static'), '/tf_static'),
+                  ('/tf', 'tf'),
+                  ('/tf_static', 'tf_static')]
+
+    param_substitutions = {
+        'use_sim_time': use_sim_time,
+        'yaml_filename': map_yaml_file
+    }
+
+    configured_params = RewrittenYaml(
+        source_file=params_file,
+        root_key=namespace,
+        param_rewrites=param_substitutions,
+        convert_types=True
+    )
+
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'namespace', default_value='',
+            description='Top-level namespace'),
+
+        DeclareLaunchArgument(
+            'map',
+            default_value=map_yaml_file,
+            description='Full path to map yaml file to load'),
+
+        DeclareLaunchArgument(
+            'use_sim_time', default_value='false',
+            description='Use simulation (Gazebo) clock if true'),
+
+        DeclareLaunchArgument(
+            'autostart', default_value='true',
+            description='Automatically startup the nav2 stack'),
+
+        DeclareLaunchArgument(
+            'params_file',
+            default_value=os.path.join("/root/workspace/src/optimal_control/config", 'amcl.yaml'),
+            description='Full path to the ROS2 parameters file to use'),
+
+        DeclareLaunchArgument(
+            'use_lifecycle_mgr', default_value='true',
+            description='Whether to launch the lifecycle manager'),
+
+        DeclareLaunchArgument(
+            'use_remappings', default_value='false',
+            description='Arguments to pass to all nodes launched by the file'),
+
+        Node(
+            package='nav2_amcl',
+            executable='amcl',
+            name='amcl',
+            output='screen',
+            parameters=[configured_params],
+            remappings=[*remappings, ("map", "/map")]),
+
+        Node(
+            condition=IfCondition(use_lifecycle_mgr),
+            package='nav2_lifecycle_manager',
+            executable='lifecycle_manager',
+            name='lifecycle_manager_localization',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time},
+                        {'autostart': autostart},
+                        {'node_names': ['map_server', 'amcl']}]),
+        
+        Node(
+            package='nav2_map_server',
+            executable='map_server',
+            name='map_server',
+            output='screen',
+            parameters=[configured_params, {'yaml_filename': map_yaml_file}],
+            remappings=remappings),
+
+        Node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='position_ekf_node',
+            output='screen',
+            parameters=[os.path.join('/root/workspace/src/optimal_control/config', 'ekf.yaml')],
+        )
+
+    ])

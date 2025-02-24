@@ -1,0 +1,3 @@
+output_bags:
+- uri: split2
+  topics: ["/odom", "/scan", "/tf", "/tf_static", "/cmd_vel", "/imu", "/odometry/filtered"]

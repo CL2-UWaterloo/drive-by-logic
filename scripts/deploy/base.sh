@@ -11,6 +11,7 @@ run_docker() {
     --name optimal_control \
     --env="DISPLAY" \
     --env="QT_X11_NO_MITSHM=1" \
+    -v /etc/localtime:/etc/localtime:ro \
     -v $(dirname "$0")/app.sh:/root/app.sh \
     $@
 }
