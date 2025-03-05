@@ -19,6 +19,7 @@ install(PROGRAMS
     scripts/run_experiment.py
     scripts/initial_guess_gen.py
     scripts/reach_avoid_physical.py
+    scripts/reach_avoid_physical_2.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

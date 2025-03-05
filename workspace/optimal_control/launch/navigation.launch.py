@@ -27,6 +27,7 @@ def generate_launch_description():
             'config',
             param_file_name))
 
+    opt_launch_file_dir = os.path.join(get_package_share_directory('optimal_control'), 'launch')
     nav2_launch_file_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
 
     rviz_config_dir = os.path.join(
@@ -64,5 +65,9 @@ def generate_launch_description():
             name='rviz2',
             arguments=['-d', rviz_config_dir],
             parameters=[{'use_sim_time': use_sim_time}],
-            output='screen')
+            output='screen'),
+        
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([opt_launch_file_dir, '/ekf.launch.py'])
+        ),
     ])

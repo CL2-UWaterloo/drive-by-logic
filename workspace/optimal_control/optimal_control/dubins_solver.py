@@ -135,7 +135,7 @@ class DubinsPlanner(Problem):
         opts = {
             "ipopt": {
                 "hessian_approximation": "limited-memory",
-                "max_iter": kwargs["iterations"],
+                "max_iter": 250,
                 
                 "tol": 1e-2,
                 

@@ -314,3 +314,44 @@ def highway() -> Environment:
     environ.po.ylim = (-1, 1)
     environ.po.title = "Highway"
     return environ
+
+def real_environment_2() -> Environment:
+
+    """
+    Height of the environment: 5 meters
+    Width of the environment: 3.5 meters
+    """
+
+    environ = Environment()
+
+    environ.set_final(
+        [
+            # Rectangle(0.45, 0.6, (0.0, 0.0)),
+            # Rectangle(1.0, 0.6, (2.5, 0.0)),
+            # Rectangle(0.45, 0.6, (0.0, 1.0))
+            Rectangle(0.6, 0.6, (4.8, -0.75)),
+            Rectangle(0.45, 0.6, (0.0, 1.0)),
+            Rectangle(0.6, 0.6, (4.8, 0.75)),
+            Rectangle(0.45, 0.6, (0.0, -1.0)),
+        ]
+    )
+
+    environ.set_obstacles(
+        [
+            Rectangle(0.4, 0.45, (0.0, 0.5)),
+            Rectangle(0.4, 0.45, (-0.0, -0.5)),
+            Rectangle(0.4, 0.45, (0.0, 1.5)),
+            Rectangle(0.4, 0.45, (0.0, -1.5)),
+            Rectangle(0.6, 0.45, (1.5, -0.4)),
+            Rectangle(0.6, 0.45, (2.0, 0.9)),
+            Rectangle(0.45, 0.6, (2.7, -1.0)),
+            Rectangle(0.45, 0.6, (4.8, 0.0)),
+            Rectangle(0.45, 0.6, (4.8, 1.5)),
+            Rectangle(0.45, 0.6, (4.8, -1.5))
+        ]
+    )
+
+    environ.po.xlim = (0, 3.5)
+    environ.po.ylim = (2.0, -2.0)
+    environ.po.title = "E3 4107"
+    return environ

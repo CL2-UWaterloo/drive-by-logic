@@ -11,6 +11,7 @@ run_docker() {
     --name optimal_control \
     --env="DISPLAY" \
     --env="QT_X11_NO_MITSHM=1" \
+    --env="LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/root/workspace/src/coinhsl/installdir/lib/x86_64-linux-gnu" \
     -v /etc/localtime:/etc/localtime:ro \
     -v $(dirname "$0")/app.sh:/root/app.sh \
     $@
