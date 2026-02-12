@@ -23,7 +23,7 @@ def generate_launch_description():
         default=os.path.join(
             get_package_share_directory('optimal_control'),
             'config',
-            'map_clean.yaml'))
+            'map_delete.yaml'))
 
     remappings = [((namespace, '/tf'), '/tf'),
                   ((namespace, '/tf_static'), '/tf_static'),

@@ -29,11 +29,11 @@ shift "$(($OPTIND -1))"
 
 if [ "$mode" == "gpu" ]; then
     if [ "$sim" == "True" ]; then
-        run_docker --runtime=nvidia \
+        run_docker \
         -v $(dirname "$0")/../../workspace/:/root/workspace/src \
         optimal_control:sim bash
     else
-        run_docker --runtime=nvidia \
+        run_docker \
         -v $(dirname "$0")/../../workspace/:/root/workspace/src \
         optimal_control:robot bash
     fi

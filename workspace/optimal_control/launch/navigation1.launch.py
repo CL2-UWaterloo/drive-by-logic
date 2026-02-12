@@ -17,9 +17,9 @@ def generate_launch_description():
         default=os.path.join(
             get_package_share_directory('optimal_control'),
             'config',
-            'map_clean.yaml'))
+            'map_delete.yaml'))
 
-    param_file_name = 'navigation2.yaml'
+    param_file_name = 'robot1_nav.yaml'
     param_dir = LaunchConfiguration(
         'params_file',
         default=os.path.join(

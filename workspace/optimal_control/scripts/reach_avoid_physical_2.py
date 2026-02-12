@@ -19,11 +19,12 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 import rclpy.qos
 
-from nav2_msgs.action import FollowPath
+from nav2_msgs.action import FollowPath, NavigateToPose
 
 import math
 
 import os
+import time
 
 def quaternion_from_euler(ai, aj, ak):
     ai /= 2.0
@@ -76,7 +77,7 @@ def reach_avoid(all_signals : list[list[Waypoint]], finals, finish_by, obstacles
     reach_1_last_goal = eventually(reach_signal, dt=dt, ub=finish_by)
 
     # Robot 1 Goal
-    signals = all_signals[1]; final = finals[2]
+    signals = all_signals[1]; final = finals[1]
     reach_signal = []
     for signal in signals:
         state = get_state_from_waypoint(signal)
@@ -110,7 +111,7 @@ def send_goal(trajectory):
         pose_msg.pose.orientation.w = quat[3]
 
         path_msg.poses.append(pose_msg)
-    
+
     path_msg.header.frame_id="map"
 
     goal = FollowPath.Goal()
@@ -119,95 +120,123 @@ def send_goal(trajectory):
     node._goal_future = goalClient.send_goal_async(goal)
     rclpy.shutdown()
 
+def go_to_pose(x, y, theta):
+    rclpy.init()
+    node = Node("PosePublisher")
+
+    goalClient = ActionClient(node, NavigateToPose, "/navigate_to_pose")
+    goalClient.wait_for_server()
+
+    pose_msg = PoseStamped()
+    pose_msg.pose.position.x = x
+    pose_msg.pose.position.y = y
+
+    quat = quaternion_from_euler(0.0, 0.0, theta)
+    pose_msg.pose.orientation.x = quat[0]
+    pose_msg.pose.orientation.y = quat[1]
+    pose_msg.pose.orientation.z = quat[2]
+    pose_msg.pose.orientation.w = quat[3]
+
+    pose_msg.header.frame_id="map"
+
+    goal = NavigateToPose.Goal()
+    goal.pose = pose_msg
+
+    node._goal_future = goalClient.send_goal_async(goal)
+    rclpy.shutdown()
+
 if __name__ == "__main__":
-    robot = LimoBot()
+    # robot = LimoBot()
 
-    initial_states = [
-        State(0.0, 1.0, 0.0, 0.0),
-        State(0.0, -1.0, 0.0, 0.0)
-    ]
+    # initial_states = [
+    #     State(-1.0, 2.0, 0.0, 0.0),
+    #     State(2, 0.7, 0.0, 0.0)
+    # ]
 
-    environ = real_environment_2()
-    finish_by = 20 #s
-    number_of_waypoints = 4
-    granularity = 50
-    number_of_agents = len(initial_states)
+    # environ = real_environment_3()
+    # finish_by = 50 #s
+    # number_of_waypoints = 4
+    # granularity = 30
+    # number_of_agents = len(initial_states)
 
-    # Compute dt
-    dt = finish_by/((number_of_waypoints - 1)*granularity)
+    # # Compute dt
+    # dt = finish_by/((number_of_waypoints - 1)*granularity)
 
-    cfhandle = prep(
-        initial_states,
-        DubinsPlanner(robot, PlannerMode.ClosedForm),
-        finish_by,
-        number_of_waypoints,
-        granularity,
-        number_of_agents
-    )
+    # cfhandle = prep(
+    #     initial_states,
+    #     DubinsPlanner(robot, PlannerMode.ClosedForm),
+    #     finish_by,
+    #     number_of_waypoints,
+    #     granularity,
+    #     number_of_agents
+    # )
 
-    agent_wise_signals = []
-    for k in range(number_of_agents):
-        agent_wise_signals.append(
-            cfhandle.problem.signals[
-                k*((number_of_waypoints-1)*granularity + 1):
-                (k+1)*((number_of_waypoints-1)*granularity + 1)
-            ]
-        )
+    # agent_wise_signals = []
+    # for k in range(number_of_agents):
+    #     agent_wise_signals.append(
+    #         cfhandle.problem.signals[
+    #             k*((number_of_waypoints-1)*granularity + 1):
+    #             (k+1)*((number_of_waypoints-1)*granularity + 1)
+    #         ]
+    #     )
 
-    robustness = reach_avoid(
-        agent_wise_signals,
-        environ.final, finish_by, environ.obstacles, dt
-    )
+    # robustness = reach_avoid(
+    #     agent_wise_signals,
+    #     environ.final, finish_by, environ.obstacles, dt
+    # )
 
-    for i in range(len(cfhandle.problem.signals)):
-        idx = str(i)
-        signal = cfhandle.problem.signals[i]
-        cfhandle.problem.set_constraint("xlimits"+idx, signal.x, lbg=0, ubg=5)
-        cfhandle.problem.set_constraint("ylimits"+idx, signal.y, lbg=-1.25, ubg=1.25)
+    # for i in range(len(cfhandle.problem.signals)):
+    #     idx = str(i)
+    #     signal = cfhandle.problem.signals[i]
+    #     cfhandle.problem.set_constraint("xlimits"+idx, signal.x, lbg=-1, ubg=3)
+    #     cfhandle.problem.set_constraint("ylimits"+idx, signal.y, lbg=-0.5, ubg=3)
 
-    cfhandle.problem.cost = -1*robustness
-    cfhandle.problem.set_constraint("robust_bool", robustness, lbg = 0.15)
+    # cfhandle.problem.cost = -1*robustness
+    # cfhandle.problem.set_constraint("robust_bool", robustness, lbg = 0.1)
 
-    cfsolution, cfsolver = cfhandle.solve()
+    # cfsolution, cfsolver = cfhandle.solve()
 
-    print("Optimization Conclusion: ", cfsolver.stats()["success"])
-    print("Robustness Value: ", '{:f}'.format(float(cfsolution["g"][-1])))
+    # print("Optimization Conclusion: ", cfsolver.stats()["success"])
+    # print("Robustness Value: ", '{:f}'.format(float(cfsolution["g"][-1])))
 
-    # Analyze the solution. Given the decision variables, feed the inputs to an actual model to get the final trajectory.
-    decision_variables = cfsolution["x"]; trajectories = []
-    # How do we split the decision variables? Split it by the number of agents first.
-    for k in range(number_of_agents):
-        agent_decisions = decision_variables[
-            k*(number_of_waypoints-1)*Waypoint.total_size :
-            (k+1)*(number_of_waypoints-1)*Waypoint.total_size
-        ]
+    # # Analyze the solution. Given the decision variables, feed the inputs to an actual model to get the final trajectory.
+    # decision_variables = cfsolution["x"]; trajectories = []
+    # # How do we split the decision variables? Split it by the number of agents first.
+    # for k in range(number_of_agents):
+    #     agent_decisions = decision_variables[
+    #         k*(number_of_waypoints-1)*Waypoint.total_size :
+    #         (k+1)*(number_of_waypoints-1)*Waypoint.total_size
+    #     ]
 
-        # Next get the waypoints
-        agent_waypoints = []
-        for i in range(number_of_waypoints-1):
-            decision = agent_decisions[i*Waypoint.total_size : (i+1)*Waypoint.total_size]
-            agent_waypoints.append(Waypoint.from_vector(decision))
+    #     # Next get the waypoints
+    #     agent_waypoints = []
+    #     for i in range(number_of_waypoints-1):
+    #         decision = agent_decisions[i*Waypoint.total_size : (i+1)*Waypoint.total_size]
+    #         agent_waypoints.append(Waypoint.from_vector(decision))
 
-        # Now forward simulate from the waypoint and note the trajectory
-        agent_trajectory = []
-        dx = initial_states[k].x; dy = initial_states[k].y; dth = initial_states[k].theta; dv = initial_states[k].v
-        for waypoint in agent_waypoints:
-            # Helps rationalize some of the decisions
-            steer_angle = float(atan(waypoint.k*robot.wheel_base))
+    #     # Now forward simulate from the waypoint and note the trajectory
+    #     agent_trajectory = []
+    #     dx = initial_states[k].x; dy = initial_states[k].y; dth = initial_states[k].theta; dv = initial_states[k].v
+    #     for waypoint in agent_waypoints:
+    #         # Helps rationalize some of the decisions
+    #         steer_angle = float(atan(waypoint.k*robot.wheel_base))
 
-            # Update Dynamic Model
-            for j in range(granularity):
-                dv += waypoint.a*dt
-                dx += dv*cos(dth)*dt; dy += dv*sin(dth)*dt
-                dth += dv*(tan(steer_angle)/robot.wheel_base)*dt
+    #         # Update Dynamic Model
+    #         for j in range(granularity):
+    #             dv += waypoint.a*dt
+    #             dx += dv*cos(dth)*dt; dy += dv*sin(dth)*dt
+    #             dth += dv*(tan(steer_angle)/robot.wheel_base)*dt
 
-                agent_trajectory.append(cast_state(State(dx, dy, dth, dv), float))
-        trajectories.append(agent_trajectory)
+    #             agent_trajectory.append(cast_state(State(dx, dy, dth, dv), float))
+    #     trajectories.append(agent_trajectory)
 
-    plotter = Plotter(environ.get_plot_options(), trajectories, environ.get_environment())
-    plotter.show_plot()
+    # plotter = Plotter(environ.get_plot_options(), trajectories, environ.get_environment())
+    # plotter.show_plot()
 
     os.environ["ROS_DOMAIN_ID"] = "148"
-    send_goal(trajectories[0])
+    # send_goal(trajectories[1])
+    go_to_pose(1.4, 2.5, 0.0)
+    time.sleep(1)
     os.environ["ROS_DOMAIN_ID"] = "147"
-    send_goal(trajectories[1])
+    # send_goal(trajectories[0])
+    go_to_pose(-0.13, 0.0, 0.0)

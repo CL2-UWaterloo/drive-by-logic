@@ -355,3 +355,44 @@ def real_environment_2() -> Environment:
     environ.po.ylim = (2.0, -2.0)
     environ.po.title = "E3 4107"
     return environ
+
+def real_environment_3() -> Environment:
+
+    """
+    Height of the environment: 3.5 meters
+    Width of the environment: 3.5 meters
+    """
+
+    environ = Environment()
+
+    environ.set_final(
+        [
+            # Rectangle(0.45, 0.6, (0.0, 0.0)),
+            # Rectangle(1.0, 0.6, (2.5, 0.0)),
+            # Rectangle(0.45, 0.6, (0.0, 1.0))
+            # Rectangle(0.6, 0.6, (4.8, -0.75)),
+            # Rectangle(0.45, 0.6, (0.0, 1.0)),
+            # Rectangle(0.6, 0.6, (4.8, 0.75)),
+            # Rectangle(0.45, 0.6, (0.0, -1.0)),
+            Rectangle(0.4, 0.4, (2, 0.7)),
+            Rectangle(0.4, 0.4, (-1, 2.0))
+        ]
+    )
+
+    environ.set_obstacles(
+        [
+            Rectangle(0.6, 0.2, (-0.603, -0.0264)),
+            Rectangle(0.2, 0.6, (2.0, 0.15)),
+            Rectangle(0.2, 0.6, (1.8, 2.6)),
+            Rectangle(0.6, 0.2, (-0.95, 2.6)),
+            Rectangle(0.2, 0.6, (1.07, 1.59)),
+            Rectangle(0.2, 0.6, (1.12, 0.64)),
+            Rectangle(0.2, 0.6, (0.0, 1.5))
+
+        ]
+    )
+
+    environ.po.xlim = (-2, 4)
+    environ.po.ylim = (-3.5, 6)
+    environ.po.title = "E3 4107"
+    return environ
